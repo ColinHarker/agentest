@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ### Added
 
+- **Persistent MCP connections** — `MCPServerTester` now uses persistent `subprocess.Popen` with stdin/stdout pipes for session continuity and stateful testing. Supports context manager protocol (`with MCPServerTester(...) as tester:`)
+- **`test_all_tools()`** — New convenience method to smoke-test every listed MCP tool with auto-generated minimal arguments from `inputSchema`
+- **PII whitelist** — `SafetyEvaluator` now accepts `pii_whitelist` parameter to suppress false positives from known-safe PII patterns (e.g., test email addresses)
+- **Enhanced schema validation** — `test_tool_schema_validation()` now validates property types, checks `required` fields exist in `properties`, and verifies `inputSchema` structure
 - **Auto-instrumentation** — `agentest.instrument()` monkey-patches `anthropic` and `openai` clients to auto-record traces with zero code changes
 - **LangChain adapter** — `AgentestCallbackHandler` converts LangChain chain/agent runs to AgentTrace (`pip install agentest[langchain]`)
 - **CrewAI adapter** — `record_crew()` and `CrewAIAdapter` record CrewAI crew executions (`pip install agentest[crewai]`)
