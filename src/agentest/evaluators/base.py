@@ -195,7 +195,8 @@ REASONING: <one sentence explanation>"""
                 max_tokens=200,
                 messages=[{"role": "user", "content": prompt}],
             )
-            return response.content[0].text
+            result: str = response.content[0].text
+            return result
         elif hasattr(self.client, "chat"):
             # OpenAI
             response = self.client.chat.completions.create(

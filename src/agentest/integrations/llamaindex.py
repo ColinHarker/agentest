@@ -33,7 +33,7 @@ except ImportError:
     )
 
 
-class AgentestHandler(BaseCallbackHandler):
+class AgentestHandler(BaseCallbackHandler):  # type: ignore[misc]
     """LlamaIndex callback handler that records interactions into an AgentTrace.
 
     Captures LLM calls, retrieval events, and tool usage to build

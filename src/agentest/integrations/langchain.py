@@ -31,7 +31,7 @@ except ImportError:
     )
 
 
-class AgentestCallbackHandler(BaseCallbackHandler):
+class AgentestCallbackHandler(BaseCallbackHandler):  # type: ignore[misc]
     """LangChain callback handler that records interactions into an AgentTrace.
 
     Captures LLM calls, tool invocations, chain starts/ends, and errors

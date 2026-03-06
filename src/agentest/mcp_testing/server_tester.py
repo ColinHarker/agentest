@@ -100,7 +100,8 @@ class MCPServerTester:
                 line = line.strip()
                 if line:
                     try:
-                        return json.loads(line)
+                        parsed: dict[str, Any] = json.loads(line)
+                        return parsed
                     except json.JSONDecodeError:
                         continue
 

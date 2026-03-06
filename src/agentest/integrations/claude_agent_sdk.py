@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import contextlib
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from typing import Any
 
 from agentest.core import AgentTrace
@@ -197,7 +197,7 @@ class AgentestTracer:
                 )
 
     @contextlib.contextmanager
-    def recording(self):
+    def recording(self) -> Generator[Recorder, None, None]:
         """Context manager for manual recording.
 
         Yields:
@@ -234,5 +234,5 @@ class AgentestTracer:
         if self._trace is None:
             raise RuntimeError("No trace to save. Call record() first.")
         recorder = Recorder(task=self._task)
-        recorder._trace = self._trace
+        recorder.trace = self._trace
         recorder.save(path, format=fmt)

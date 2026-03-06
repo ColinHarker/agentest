@@ -39,7 +39,8 @@ def _get_recorder(task: str = "auto-instrumented") -> Recorder:
     """Get the current thread's recorder, creating one if needed."""
     if not hasattr(_local, "recorder") or _local.recorder is None:
         _local.recorder = Recorder(task=task)
-    return _local.recorder
+    recorder: Recorder = _local.recorder
+    return recorder
 
 
 def _finalize_and_store(success: bool = True, error: str | None = None) -> AgentTrace:
