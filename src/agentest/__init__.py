@@ -39,11 +39,13 @@ from agentest.evaluators.metrics import (
     MetricResult,
 )
 from agentest.integrations.instrument import (
+    clear_exporter,
     clear_traces,
     flush_trace,
     get_current_recorder,
     get_traces,
     instrument,
+    set_exporter,
     uninstrument,
 )
 from agentest.integrations.middleware import (
@@ -135,6 +137,8 @@ __all__ = [
     "clear_traces",
     "flush_trace",
     "get_current_recorder",
+    "set_exporter",
+    "clear_exporter",
     # Middleware
     "AgentestMiddleware",
     "FlaskAgentestMiddleware",
