@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+import selectors
 import subprocess
 import time
 from dataclasses import dataclass
 from typing import Any
+
+import agentest
 
 
 @dataclass
@@ -29,27 +32,22 @@ class MCPServerTester:
     """Test an MCP server by sending requests and verifying responses.
 
     Supports MCP servers launched via stdio (subprocess) transport.
+    Maintains a persistent connection to the server process for session
+    continuity and stateful testing.
 
     Usage:
-        tester = MCPServerTester(
-            command=["python", "-m", "my_mcp_server"],
-            env={"API_KEY": "test"},
-        )
+        # As context manager (recommended)
+        with MCPServerTester(command=["python", "-m", "my_mcp_server"]) as tester:
+            result = tester.test_initialize()
+            assert result.passed
 
-        # Test tool listing
+            result = tester.test_tool_call("read_file", {"path": "/tmp/test.txt"})
+            assert result.passed
+
+        # Without context manager (lazy start, cleanup on garbage collection)
+        tester = MCPServerTester(command=["python", "-m", "my_mcp_server"])
         result = tester.test_list_tools()
-        assert result.passed
-
-        # Test a specific tool call
-        result = tester.test_tool_call(
-            tool_name="read_file",
-            arguments={"path": "/tmp/test.txt"},
-            expected_result="file contents",
-        )
-        assert result.passed
-
-        # Run all standard tests
-        results = tester.run_standard_tests()
+        tester.close()
     """
 
     def __init__(
@@ -62,6 +60,56 @@ class MCPServerTester:
         self.env = env
         self.timeout_seconds = timeout_seconds
         self._request_id = 0
+        self._process: subprocess.Popen[str] | None = None
+        self._start_error: str | None = None
+
+    def start(self) -> None:
+        """Start the MCP server process."""
+        if self._process is not None:
+            return
+        try:
+            self._process = subprocess.Popen(
+                self.command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=self.env,
+            )
+        except FileNotFoundError:
+            self._start_error = f"Command not found: {self.command}"
+
+    def close(self) -> None:
+        """Stop the MCP server process."""
+        if self._process is None:
+            return
+        try:
+            if self._process.stdin:
+                self._process.stdin.close()
+            self._process.terminate()
+            try:
+                self._process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self._process.kill()
+                self._process.wait(timeout=5)
+        except OSError:
+            pass
+        self._process = None
+
+    def __enter__(self) -> MCPServerTester:
+        self.start()
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.close()
+
+    def __del__(self) -> None:
+        self.close()
+
+    def _ensure_started(self) -> None:
+        """Lazily start the server if not already running."""
+        if self._process is None and self._start_error is None:
+            self.start()
 
     def _next_id(self) -> int:
         self._request_id += 1
@@ -79,38 +127,49 @@ class MCPServerTester:
         return request
 
     def _send_request(self, request: dict[str, Any]) -> dict[str, Any]:
-        """Send a request to the MCP server via stdio and get the response."""
-        input_data = json.dumps(request) + "\n"
+        """Send a request to the MCP server via persistent stdio connection."""
+        self._ensure_started()
+
+        if self._start_error:
+            return {"error": {"code": -3, "message": self._start_error}}
+
+        proc = self._process
+        if proc is None or proc.stdin is None or proc.stdout is None:
+            return {"error": {"code": -1, "message": "Server process not available"}}
+
+        # Check if process has died
+        if proc.poll() is not None:
+            stderr = proc.stderr.read() if proc.stderr else ""
+            return {"error": {"code": -1, "message": stderr.strip() or "Server process died"}}
+
+        line = json.dumps(request) + "\n"
+        try:
+            proc.stdin.write(line)
+            proc.stdin.flush()
+        except (BrokenPipeError, OSError):
+            return {"error": {"code": -1, "message": "Server process died"}}
+
+        # Read response with timeout using selectors
+        sel = selectors.DefaultSelector()
+        try:
+            sel.register(proc.stdout, selectors.EVENT_READ)
+            ready = sel.select(timeout=self.timeout_seconds)
+        finally:
+            sel.close()
+
+        if not ready:
+            return {"error": {"code": -2, "message": f"Timeout after {self.timeout_seconds}s"}}
+
+        response_line = proc.stdout.readline()
+        if not response_line:
+            stderr = proc.stderr.read() if proc.stderr else ""
+            return {"error": {"code": -1, "message": stderr.strip() or "Server closed connection"}}
 
         try:
-            result = subprocess.run(
-                self.command,
-                input=input_data,
-                capture_output=True,
-                text=True,
-                timeout=self.timeout_seconds,
-                env=self.env,
-            )
-
-            if result.returncode != 0 and not result.stdout.strip():
-                return {"error": {"code": -1, "message": result.stderr.strip()}}
-
-            # Parse the first JSON line from stdout
-            for line in result.stdout.strip().split("\n"):
-                line = line.strip()
-                if line:
-                    try:
-                        parsed: dict[str, Any] = json.loads(line)
-                        return parsed
-                    except json.JSONDecodeError:
-                        continue
-
-            return {"error": {"code": -1, "message": "No valid JSON response"}}
-
-        except subprocess.TimeoutExpired:
-            return {"error": {"code": -2, "message": f"Timeout after {self.timeout_seconds}s"}}
-        except FileNotFoundError:
-            return {"error": {"code": -3, "message": f"Command not found: {self.command}"}}
+            parsed: dict[str, Any] = json.loads(response_line)
+            return parsed
+        except json.JSONDecodeError:
+            return {"error": {"code": -1, "message": "Invalid JSON response"}}
 
     def test_initialize(self) -> MCPTestResult:
         """Test MCP server initialization."""
@@ -120,7 +179,7 @@ class MCPServerTester:
             {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {},
-                "clientInfo": {"name": "agentest", "version": "0.1.0"},
+                "clientInfo": {"name": "agentest", "version": agentest.__version__},
             },
         )
 
@@ -141,6 +200,10 @@ class MCPServerTester:
         result = response.get("result", {})
         has_version = "protocolVersion" in result
         has_capabilities = "capabilities" in result
+
+        if has_version and has_capabilities:
+            # Send initialized notification as required by MCP protocol
+            self._send_request({"jsonrpc": "2.0", "method": "notifications/initialized"})
 
         return MCPTestResult(
             test_name="initialize",
@@ -294,6 +357,7 @@ class MCPServerTester:
             return [list_result]
 
         tools = list_result.response.get("result", {}).get("tools", [])
+        valid_types = {"string", "number", "integer", "boolean", "array", "object", "null"}
 
         for tool in tools:
             start = time.time()
@@ -303,20 +367,46 @@ class MCPServerTester:
             has_schema = "inputSchema" in tool
             valid_schema = True
 
+            issues: list[str] = []
+
             if has_schema:
                 schema = tool["inputSchema"]
                 valid_schema = isinstance(schema, dict) and schema.get("type") == "object"
 
+                # Validate properties
+                props = schema.get("properties", {})
+                if not isinstance(props, dict):
+                    valid_schema = False
+                    issues.append("properties is not a dict")
+                else:
+                    # Validate property types
+                    for prop_name, prop_def in props.items():
+                        if isinstance(prop_def, dict):
+                            prop_type = prop_def.get("type")
+                            if prop_type and prop_type not in valid_types:
+                                issues.append(
+                                    f"property {prop_name!r} has invalid type: {prop_type!r}"
+                                )
+                                valid_schema = False
+
+                # Validate required
+                required = schema.get("required", [])
+                if not isinstance(required, list):
+                    valid_schema = False
+                    issues.append("required is not a list")
+                elif isinstance(props, dict) and props:
+                    missing_required = [r for r in required if r not in props]
+                    if missing_required:
+                        issues.append(f"required fields not in properties: {missing_required}")
+
             duration = (time.time() - start) * 1000
-            issues = []
+
             if not has_name:
                 issues.append("missing name")
             if not has_description:
                 issues.append("missing description")
             if not has_schema:
                 issues.append("missing inputSchema")
-            if not valid_schema:
-                issues.append("invalid inputSchema")
 
             results.append(
                 MCPTestResult(
@@ -328,3 +418,60 @@ class MCPServerTester:
             )
 
         return results
+
+    def test_all_tools(
+        self, tool_arguments: dict[str, dict[str, Any]] | None = None
+    ) -> list[MCPTestResult]:
+        """Test every listed tool by calling it with minimal arguments.
+
+        Args:
+            tool_arguments: Optional mapping of tool_name -> arguments to use.
+                Tools not in this dict will be called with arguments
+                generated from their inputSchema defaults.
+        """
+        tool_arguments = tool_arguments or {}
+        results: list[MCPTestResult] = []
+
+        list_result = self.test_list_tools()
+        if not list_result.passed or not list_result.response:
+            return [list_result]
+
+        tools = list_result.response.get("result", {}).get("tools", [])
+
+        for tool in tools:
+            name = tool.get("name", "unknown")
+            args = tool_arguments.get(name, self._generate_default_args(tool))
+            result = self.test_tool_call(tool_name=name, arguments=args)
+            results.append(result)
+
+        return results
+
+    @staticmethod
+    def _generate_default_args(tool: dict[str, Any]) -> dict[str, Any]:
+        """Generate minimal valid arguments from a tool's inputSchema."""
+        schema = tool.get("inputSchema", {})
+        required = schema.get("required", [])
+        properties = schema.get("properties", {})
+        args: dict[str, Any] = {}
+
+        type_defaults: dict[str, Any] = {
+            "string": "",
+            "number": 0,
+            "integer": 0,
+            "boolean": False,
+            "array": [],
+            "object": {},
+        }
+
+        for field_name in required:
+            prop = properties.get(field_name, {})
+            field_type = prop.get("type", "string")
+            # Use enum first value if available
+            if "enum" in prop and prop["enum"]:
+                args[field_name] = prop["enum"][0]
+            elif "default" in prop:
+                args[field_name] = prop["default"]
+            else:
+                args[field_name] = type_defaults.get(field_type, "")
+
+        return args

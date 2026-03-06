@@ -104,10 +104,10 @@ class Recorder:
             result = read_file(path="doc.txt")  # automatically recorded
         """
 
-        def wrapper(**kwargs: Any) -> Any:
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             start = time.time()
             try:
-                result = func(**kwargs)
+                result = func(*args, **kwargs)
                 duration = (time.time() - start) * 1000
                 self.record_tool_call(
                     name=name, arguments=kwargs, result=result, duration_ms=duration

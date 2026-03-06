@@ -24,6 +24,7 @@ from agentest.reporters.console import ConsoleReporter
 from agentest.reporters.json_reporter import JSONReporter
 
 console = Console()
+err_console = Console(stderr=True)
 reporter = ConsoleReporter(console)
 
 
@@ -123,7 +124,7 @@ def summary(trace_dir: str, fmt: str) -> None:
             try:
                 traces.append(Recorder.load(f))
             except Exception as e:
-                console.print(f"[yellow]Warning: Could not load {f}: {e}[/yellow]")
+                err_console.print(f"[yellow]Warning: Could not load {f}: {e}[/yellow]")
 
     if not traces:
         console.print("[yellow]No traces found.[/yellow]")

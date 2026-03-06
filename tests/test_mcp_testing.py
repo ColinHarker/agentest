@@ -1,13 +1,44 @@
 """Tests for MCP server tester and assertions."""
 
 import json
-import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from agentest.mcp_testing.assertions import MCPAssertions
 from agentest.mcp_testing.server_tester import MCPServerTester, MCPTestResult
+
+# ---- Helpers ----
+
+
+def _mock_popen(responses: list[str]) -> MagicMock:
+    """Create a mock Popen that returns JSON responses in order."""
+    mock_proc = MagicMock()
+    mock_proc.stdin = MagicMock()
+    mock_proc.stdout = MagicMock()
+    mock_proc.stderr = MagicMock()
+    mock_proc.stderr.read.return_value = ""
+    mock_proc.stdout.readline = MagicMock(side_effect=[r + "\n" for r in responses])
+    mock_proc.stdout.fileno = MagicMock(return_value=0)
+    mock_proc.poll.return_value = None  # process still running
+    mock_proc.wait.return_value = 0
+    return mock_proc
+
+
+def _mock_selector() -> MagicMock:
+    """Create a mock selector that always indicates ready."""
+    mock_sel = MagicMock()
+    mock_sel.select.return_value = [("ready",)]  # non-empty = ready
+    return mock_sel
+
+
+def _patch_popen_and_selector(mock_proc: MagicMock):
+    """Return stacked context managers for Popen and selector patches."""
+    return (
+        patch("subprocess.Popen", return_value=mock_proc),
+        patch("selectors.DefaultSelector", return_value=_mock_selector()),
+    )
+
 
 # ---- MCPTestResult ----
 
@@ -48,6 +79,41 @@ def test_make_request_increments_id():
     assert r2["id"] == r1["id"] + 1
 
 
+# ---- MCPServerTester lifecycle ----
+
+
+def test_context_manager_lifecycle():
+    mock_proc = _mock_popen([])
+    with patch("subprocess.Popen", return_value=mock_proc):
+        with MCPServerTester(command=["fake-server"]) as tester:
+            assert tester._process is not None
+        # After exit, process should be cleaned up
+        mock_proc.terminate.assert_called_once()
+
+
+def test_lazy_start():
+    response = json.dumps({"jsonrpc": "2.0", "id": 1, "result": {"tools": []}})
+    mock_proc = _mock_popen([response])
+    popen_patch, sel_patch = _patch_popen_and_selector(mock_proc)
+
+    with popen_patch, sel_patch:
+        tester = MCPServerTester(command=["fake"])
+        assert tester._process is None  # not started yet
+        tester.test_list_tools()
+        assert tester._process is not None  # started on first request
+        tester.close()
+
+
+def test_close_idempotent():
+    mock_proc = _mock_popen([])
+    with patch("subprocess.Popen", return_value=mock_proc):
+        tester = MCPServerTester(command=["fake"])
+        tester.start()
+        tester.close()
+        tester.close()  # second close should not raise
+        assert tester._process is None
+
+
 # ---- MCPServerTester.test_initialize ----
 
 
@@ -62,14 +128,14 @@ def test_initialize_success():
             },
         }
     )
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = response + "\n"
-    mock_result.stderr = ""
+    # Two responses: one for initialize, one consumed by the initialized notification
+    mock_proc = _mock_popen([response, "{}"])
+    popen_patch, sel_patch = _patch_popen_and_selector(mock_proc)
 
-    with patch("subprocess.run", return_value=mock_result):
+    with popen_patch, sel_patch:
         tester = MCPServerTester(command=["fake-server"])
         result = tester.test_initialize()
+        tester.close()
 
     assert result.passed is True
     assert result.test_name == "initialize"
@@ -78,14 +144,13 @@ def test_initialize_success():
 
 def test_initialize_missing_fields():
     response = json.dumps({"jsonrpc": "2.0", "id": 1, "result": {}})
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = response + "\n"
-    mock_result.stderr = ""
+    mock_proc = _mock_popen([response])
+    popen_patch, sel_patch = _patch_popen_and_selector(mock_proc)
 
-    with patch("subprocess.run", return_value=mock_result):
+    with popen_patch, sel_patch:
         tester = MCPServerTester(command=["fake-server"])
         result = tester.test_initialize()
+        tester.close()
 
     assert result.passed is False
     assert "Missing" in result.error
@@ -99,14 +164,13 @@ def test_initialize_error_response():
             "error": {"code": -1, "message": "crash"},
         }
     )
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = response + "\n"
-    mock_result.stderr = ""
+    mock_proc = _mock_popen([response])
+    popen_patch, sel_patch = _patch_popen_and_selector(mock_proc)
 
-    with patch("subprocess.run", return_value=mock_result):
+    with popen_patch, sel_patch:
         tester = MCPServerTester(command=["fake-server"])
         result = tester.test_initialize()
+        tester.close()
 
     assert result.passed is False
     assert result.error == "crash"
@@ -123,14 +187,13 @@ def test_list_tools_success():
             "result": {"tools": [{"name": "read_file"}, {"name": "write_file"}]},
         }
     )
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = response + "\n"
-    mock_result.stderr = ""
+    mock_proc = _mock_popen([response])
+    popen_patch, sel_patch = _patch_popen_and_selector(mock_proc)
 
-    with patch("subprocess.run", return_value=mock_result):
+    with popen_patch, sel_patch:
         tester = MCPServerTester(command=["fake"])
         result = tester.test_list_tools()
+        tester.close()
 
     assert result.passed is True
     assert result.test_name == "list_tools"
@@ -140,16 +203,24 @@ def test_list_tools_success():
 
 
 def test_timeout_handling():
-    with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="x", timeout=5)):
+    mock_proc = _mock_popen([])
+    mock_sel = MagicMock()
+    mock_sel.select.return_value = []  # empty = timeout
+
+    with (
+        patch("subprocess.Popen", return_value=mock_proc),
+        patch("selectors.DefaultSelector", return_value=mock_sel),
+    ):
         tester = MCPServerTester(command=["slow-server"], timeout_seconds=5)
         result = tester.test_initialize()
+        tester.close()
 
     assert result.passed is False
     assert "Timeout" in result.error
 
 
 def test_file_not_found_handling():
-    with patch("subprocess.run", side_effect=FileNotFoundError()):
+    with patch("subprocess.Popen", side_effect=FileNotFoundError()):
         tester = MCPServerTester(command=["nonexistent"])
         result = tester.test_initialize()
 
@@ -158,31 +229,287 @@ def test_file_not_found_handling():
 
 
 def test_invalid_json_handling():
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = "not json at all\n"
-    mock_result.stderr = ""
+    mock_proc = _mock_popen(["not json at all"])
+    popen_patch, sel_patch = _patch_popen_and_selector(mock_proc)
 
-    with patch("subprocess.run", return_value=mock_result):
+    with popen_patch, sel_patch:
         tester = MCPServerTester(command=["bad-server"])
         result = tester.test_list_tools()
+        tester.close()
 
     assert result.passed is False
-    assert "No valid JSON" in result.error
+    assert "Invalid JSON" in result.error
 
 
-def test_nonzero_exit_no_stdout():
-    mock_result = MagicMock()
-    mock_result.returncode = 1
-    mock_result.stdout = ""
-    mock_result.stderr = "segfault"
+def test_process_crash_detection():
+    mock_proc = _mock_popen([])
+    mock_proc.stdout.readline = MagicMock(return_value="")  # empty = EOF
+    popen_patch, sel_patch = _patch_popen_and_selector(mock_proc)
 
-    with patch("subprocess.run", return_value=mock_result):
+    with popen_patch, sel_patch:
         tester = MCPServerTester(command=["crash-server"])
         result = tester.test_list_tools()
+        tester.close()
 
     assert result.passed is False
-    assert "segfault" in result.error
+
+
+# ---- Schema validation ----
+
+
+def test_schema_validation_valid():
+    tools_response = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+                "tools": [
+                    {
+                        "name": "read_file",
+                        "description": "Read a file",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {"path": {"type": "string"}},
+                            "required": ["path"],
+                        },
+                    }
+                ]
+            },
+        }
+    )
+    mock_proc = _mock_popen([tools_response])
+    popen_patch, sel_patch = _patch_popen_and_selector(mock_proc)
+
+    with popen_patch, sel_patch:
+        tester = MCPServerTester(command=["fake"])
+        results = tester.test_tool_schema_validation()
+        tester.close()
+
+    assert len(results) == 1
+    assert results[0].passed is True
+
+
+def test_schema_validation_invalid_properties():
+    tools_response = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+                "tools": [
+                    {
+                        "name": "bad_tool",
+                        "description": "Has bad schema",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": "not a dict",
+                        },
+                    }
+                ]
+            },
+        }
+    )
+    mock_proc = _mock_popen([tools_response])
+    popen_patch, sel_patch = _patch_popen_and_selector(mock_proc)
+
+    with popen_patch, sel_patch:
+        tester = MCPServerTester(command=["fake"])
+        results = tester.test_tool_schema_validation()
+        tester.close()
+
+    assert len(results) == 1
+    assert results[0].passed is False
+    assert "properties is not a dict" in results[0].error
+
+
+def test_schema_validation_missing_required_in_properties():
+    tools_response = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+                "tools": [
+                    {
+                        "name": "tool",
+                        "description": "Missing required field",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {"a": {"type": "string"}},
+                            "required": ["a", "b"],
+                        },
+                    }
+                ]
+            },
+        }
+    )
+    mock_proc = _mock_popen([tools_response])
+    popen_patch, sel_patch = _patch_popen_and_selector(mock_proc)
+
+    with popen_patch, sel_patch:
+        tester = MCPServerTester(command=["fake"])
+        results = tester.test_tool_schema_validation()
+        tester.close()
+
+    assert len(results) == 1
+    assert "required fields not in properties" in results[0].error
+
+
+def test_schema_validation_invalid_property_type():
+    tools_response = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+                "tools": [
+                    {
+                        "name": "tool",
+                        "description": "Bad type",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {"x": {"type": "banana"}},
+                        },
+                    }
+                ]
+            },
+        }
+    )
+    mock_proc = _mock_popen([tools_response])
+    popen_patch, sel_patch = _patch_popen_and_selector(mock_proc)
+
+    with popen_patch, sel_patch:
+        tester = MCPServerTester(command=["fake"])
+        results = tester.test_tool_schema_validation()
+        tester.close()
+
+    assert len(results) == 1
+    assert results[0].passed is False
+    assert "invalid type" in results[0].error
+
+
+# ---- test_all_tools ----
+
+
+def test_all_tools_calls_each_tool():
+    tools_response = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+                "tools": [
+                    {"name": "tool_a", "inputSchema": {"type": "object"}},
+                    {"name": "tool_b", "inputSchema": {"type": "object"}},
+                ]
+            },
+        }
+    )
+    call_a_response = json.dumps(
+        {"jsonrpc": "2.0", "id": 2, "result": {"content": [{"type": "text", "text": "ok"}]}}
+    )
+    call_b_response = json.dumps(
+        {"jsonrpc": "2.0", "id": 3, "result": {"content": [{"type": "text", "text": "ok"}]}}
+    )
+    mock_proc = _mock_popen([tools_response, call_a_response, call_b_response])
+    popen_patch, sel_patch = _patch_popen_and_selector(mock_proc)
+
+    with popen_patch, sel_patch:
+        tester = MCPServerTester(command=["fake"])
+        results = tester.test_all_tools()
+        tester.close()
+
+    assert len(results) == 2
+    assert results[0].test_name == "tool_call:tool_a"
+    assert results[1].test_name == "tool_call:tool_b"
+    assert all(r.passed for r in results)
+
+
+def test_all_tools_with_custom_args():
+    tools_response = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {"tools": [{"name": "echo", "inputSchema": {"type": "object"}}]},
+        }
+    )
+    call_response = json.dumps(
+        {"jsonrpc": "2.0", "id": 2, "result": {"content": [{"type": "text", "text": "hello"}]}}
+    )
+    mock_proc = _mock_popen([tools_response, call_response])
+    popen_patch, sel_patch = _patch_popen_and_selector(mock_proc)
+
+    with popen_patch, sel_patch:
+        tester = MCPServerTester(command=["fake"])
+        results = tester.test_all_tools(tool_arguments={"echo": {"input": "hello"}})
+        tester.close()
+
+    assert len(results) == 1
+    assert results[0].passed
+
+
+def test_all_tools_generates_defaults():
+    tools_response = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+                "tools": [
+                    {
+                        "name": "greet",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "count": {"type": "integer"},
+                            },
+                            "required": ["name"],
+                        },
+                    }
+                ]
+            },
+        }
+    )
+    call_response = json.dumps(
+        {"jsonrpc": "2.0", "id": 2, "result": {"content": [{"type": "text", "text": "hi"}]}}
+    )
+    mock_proc = _mock_popen([tools_response, call_response])
+    popen_patch, sel_patch = _patch_popen_and_selector(mock_proc)
+
+    with popen_patch, sel_patch:
+        tester = MCPServerTester(command=["fake"])
+        results = tester.test_all_tools()
+        tester.close()
+
+    assert len(results) == 1
+    assert results[0].passed
+    # Verify default args were generated (name is required, should get "")
+    call_args = json.loads(mock_proc.stdin.write.call_args_list[1][0][0])
+    assert call_args["params"]["arguments"]["name"] == ""
+
+
+def test_generate_default_args_enum():
+    tool = {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "format": {"type": "string", "enum": ["json", "yaml"]},
+            },
+            "required": ["format"],
+        }
+    }
+    args = MCPServerTester._generate_default_args(tool)
+    assert args == {"format": "json"}
+
+
+def test_generate_default_args_with_default_value():
+    tool = {
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "count": {"type": "integer", "default": 10},
+            },
+            "required": ["count"],
+        }
+    }
+    args = MCPServerTester._generate_default_args(tool)
+    assert args == {"count": 10}
 
 
 # ---- MCPAssertions ----

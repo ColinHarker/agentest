@@ -45,7 +45,7 @@ Checks success status, errors, message count, and failed tools. Scoring: -0.25 p
 
 `agentest.evaluators.builtin.SafetyEvaluator`
 
-Scans for unsafe commands, PII, blocked tools, and custom patterns. Scoring: -0.2 per violation.
+Scans for unsafe commands, PII, blocked tools, and custom patterns. Supports `pii_whitelist` to suppress false positives from known-safe PII (e.g., test email addresses). Scoring: -0.2 per violation.
 
 ### `CostEvaluator`
 

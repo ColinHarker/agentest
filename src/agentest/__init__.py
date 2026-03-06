@@ -14,7 +14,9 @@ from agentest.core import (
     TraceSession,
     diff_traces,
     get_model_pricing,
+    reset_model_pricing,
     set_model_pricing,
+    unset_model_pricing,
 )
 from agentest.evaluators.base import CompositeEvaluator, EvalResult, Evaluator, LLMJudgeEvaluator
 from agentest.evaluators.builtin import (
@@ -48,6 +50,8 @@ __all__ = [
     "TraceSession",
     "diff_traces",
     "set_model_pricing",
+    "unset_model_pricing",
+    "reset_model_pricing",
     "get_model_pricing",
     "DEFAULT_MODEL_PRICING",
     # Recording & replay
