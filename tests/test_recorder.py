@@ -3,17 +3,21 @@
 import tempfile
 from pathlib import Path
 
-from agentest.core import AgentTrace
+import pytest
+
 from agentest.recorder.recorder import Recorder
 from agentest.recorder.replayer import Replayer, ReplayMismatchError
-
-import pytest
 
 
 def test_recorder_basic():
     rec = Recorder(task="Test task")
     rec.record_message("user", "Hello")
-    rec.record_llm_response(model="test-model", content="Hi there", input_tokens=10, output_tokens=5)
+    rec.record_llm_response(
+        model="test-model",
+        content="Hi there",
+        input_tokens=10,
+        output_tokens=5,
+    )
     rec.record_tool_call(name="search", arguments={"q": "test"}, result=["result1"])
     trace = rec.finalize(success=True)
 

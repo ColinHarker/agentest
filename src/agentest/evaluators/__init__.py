@@ -1,11 +1,11 @@
 """Evaluation system for grading agent performance."""
 
-from agentest.evaluators.base import Evaluator, EvalResult
+from agentest.evaluators.base import EvalResult, Evaluator
 from agentest.evaluators.builtin import (
-    TaskCompletionEvaluator,
-    SafetyEvaluator,
     CostEvaluator,
     LatencyEvaluator,
+    SafetyEvaluator,
+    TaskCompletionEvaluator,
     ToolUsageEvaluator,
 )
 

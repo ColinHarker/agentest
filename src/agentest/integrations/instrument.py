@@ -138,14 +138,20 @@ def _wrap_anthropic_create(original: Any) -> Any:
                 if hasattr(block, "text"):
                     content_text += block.text
                 elif hasattr(block, "type") and block.type == "tool_use":
-                    tool_calls_in_response.append({
-                        "name": block.name,
-                        "arguments": block.input if hasattr(block, "input") else {},
-                        "id": block.id if hasattr(block, "id") else None,
-                    })
+                    tool_calls_in_response.append(
+                        {
+                            "name": block.name,
+                            "arguments": block.input if hasattr(block, "input") else {},
+                            "id": block.id if hasattr(block, "id") else None,
+                        }
+                    )
 
-        input_tokens = getattr(response.usage, "input_tokens", 0) if hasattr(response, "usage") else 0
-        output_tokens = getattr(response.usage, "output_tokens", 0) if hasattr(response, "usage") else 0
+        input_tokens = (
+            getattr(response.usage, "input_tokens", 0) if hasattr(response, "usage") else 0
+        )
+        output_tokens = (
+            getattr(response.usage, "output_tokens", 0) if hasattr(response, "usage") else 0
+        )
 
         recorder.record_llm_response(
             model=model,
@@ -208,13 +214,19 @@ def _wrap_anthropic_create_async(original: Any) -> Any:
                 if hasattr(block, "text"):
                     content_text += block.text
                 elif hasattr(block, "type") and block.type == "tool_use":
-                    tool_calls_in_response.append({
-                        "name": block.name,
-                        "arguments": block.input if hasattr(block, "input") else {},
-                    })
+                    tool_calls_in_response.append(
+                        {
+                            "name": block.name,
+                            "arguments": block.input if hasattr(block, "input") else {},
+                        }
+                    )
 
-        input_tokens = getattr(response.usage, "input_tokens", 0) if hasattr(response, "usage") else 0
-        output_tokens = getattr(response.usage, "output_tokens", 0) if hasattr(response, "usage") else 0
+        input_tokens = (
+            getattr(response.usage, "input_tokens", 0) if hasattr(response, "usage") else 0
+        )
+        output_tokens = (
+            getattr(response.usage, "output_tokens", 0) if hasattr(response, "usage") else 0
+        )
 
         recorder.record_llm_response(
             model=model,
@@ -271,7 +283,9 @@ def _wrap_openai_create(original: Any) -> Any:
                     import json as _json
 
                     try:
-                        args_dict = _json.loads(tc.function.arguments) if tc.function.arguments else {}
+                        args_dict = (
+                            _json.loads(tc.function.arguments) if tc.function.arguments else {}
+                        )
                     except (ValueError, AttributeError):
                         args_dict = {}
                     recorder.record_tool_call(
@@ -332,10 +346,14 @@ def _wrap_openai_create_async(original: Any) -> Any:
                     import json as _json
 
                     try:
-                        args_dict = _json.loads(tc.function.arguments) if tc.function.arguments else {}
+                        args_dict = (
+                            _json.loads(tc.function.arguments) if tc.function.arguments else {}
+                        )
                     except (ValueError, AttributeError):
                         args_dict = {}
-                    recorder.record_tool_call(name=tc.function.name, arguments=args_dict, result=None)
+                    recorder.record_tool_call(
+                        name=tc.function.name, arguments=args_dict, result=None
+                    )
 
         usage = response.usage if hasattr(response, "usage") else None
         input_tokens = getattr(usage, "prompt_tokens", 0) if usage else 0
@@ -412,9 +430,7 @@ def instrument(
             # Patch async client
             async_completions_cls = openai_mod.resources.chat.completions.AsyncCompletions
             _original_openai_create_async = async_completions_cls.create
-            async_completions_cls.create = _wrap_openai_create_async(
-                _original_openai_create_async
-            )
+            async_completions_cls.create = _wrap_openai_create_async(_original_openai_create_async)
         except (ImportError, AttributeError):
             pass  # openai not installed or API changed
 

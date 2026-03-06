@@ -3,22 +3,19 @@
 from __future__ import annotations
 
 import sys
-import time
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from agentest.core import AgentTrace
-from agentest.recorder.recorder import Recorder
 
 # Force-import the module first, then get the actual module object
-from agentest.integrations import instrument as _instrument_func  # noqa: trigger import
 from agentest.integrations.instrument import (
-    _get_recorder,
-    _finalize_and_store,
-    _wrap_anthropic_create,
-    _wrap_openai_create,
+    _finalize_and_store,  # noqa: F401
+    _get_recorder,  # noqa: F401
+    _wrap_anthropic_create,  # noqa: F401
+    _wrap_openai_create,  # noqa: F401
     clear_traces,
     flush_trace,
     get_current_recorder,
@@ -26,6 +23,7 @@ from agentest.integrations.instrument import (
     instrument,
     uninstrument,
 )
+from agentest.recorder.recorder import Recorder
 
 # Get the actual module object (not the function)
 _inst_mod = sys.modules["agentest.integrations.instrument"]
@@ -459,7 +457,6 @@ class TestGitHubAction:
         }
 
         # Add the action dir to sys.path so we can import
-        action_dir = str(tmp_path.parent.parent.parent / "home" / "user" / "claude-fun")
         sys.path.insert(0, "/home/user/claude-fun")
 
         with patch.dict(os.environ, env, clear=False):
@@ -487,7 +484,7 @@ class TestGitHubAction:
         recorder.record_llm_response(
             model="claude-sonnet-4-6", content="Hi", input_tokens=10, output_tokens=5
         )
-        trace = recorder.finalize(success=True)
+        recorder.finalize(success=True)
         recorder.save(traces_dir / "test.yaml")
 
         output_file = str(tmp_path / "report.json")

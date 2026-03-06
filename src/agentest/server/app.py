@@ -1,17 +1,14 @@
 """FastAPI application for the Agentest web UI."""
 
-import json
-import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from agentest.core import AgentTrace, diff_traces
-from agentest.evaluators.base import CompositeEvaluator, EvalResult
 from agentest.evaluators.builtin import (
     CostEvaluator,
     LatencyEvaluator,
@@ -55,7 +52,7 @@ def create_app(traces_dir: str = "traces") -> FastAPI:
                     continue
         return traces
 
-    def _load_trace(trace_id: str) -> Optional[AgentTrace]:
+    def _load_trace(trace_id: str) -> AgentTrace | None:
         """Load a specific trace by ID."""
         for f in traces_path.iterdir():
             if f.suffix in (".yaml", ".yml", ".json"):
@@ -91,21 +88,23 @@ def create_app(traces_dir: str = "traces") -> FastAPI:
             trace_obj = AgentTrace.model_validate(t)
             total_cost = trace_obj.total_cost
 
-            summaries.append({
-                "id": t["id"],
-                "task": t.get("task", ""),
-                "success": t.get("success"),
-                "start_time": t.get("start_time"),
-                "end_time": t.get("end_time"),
-                "duration_ms": trace_obj.duration_ms,
-                "total_tokens": total_tokens,
-                "total_cost": total_cost,
-                "llm_calls": len(llm_responses),
-                "tool_calls": len(tool_calls),
-                "failed_tools": sum(1 for tc in tool_calls if tc.get("error")),
-                "models": list({r.get("model", "") for r in llm_responses}),
-                "file": t.get("_file", ""),
-            })
+            summaries.append(
+                {
+                    "id": t["id"],
+                    "task": t.get("task", ""),
+                    "success": t.get("success"),
+                    "start_time": t.get("start_time"),
+                    "end_time": t.get("end_time"),
+                    "duration_ms": trace_obj.duration_ms,
+                    "total_tokens": total_tokens,
+                    "total_cost": total_cost,
+                    "llm_calls": len(llm_responses),
+                    "tool_calls": len(tool_calls),
+                    "failed_tools": sum(1 for tc in tool_calls if tc.get("error")),
+                    "models": list({r.get("model", "") for r in llm_responses}),
+                    "file": t.get("_file", ""),
+                }
+            )
 
         return {"traces": summaries, "total": len(summaries)}
 
@@ -128,9 +127,9 @@ def create_app(traces_dir: str = "traces") -> FastAPI:
     class EvaluateRequest(BaseModel):
         trace_id: str
         evaluators: list[str] = ["task_completion", "safety", "cost", "tool_usage", "latency"]
-        max_cost: Optional[float] = None
-        max_tokens: Optional[int] = None
-        max_time_ms: Optional[float] = None
+        max_cost: float | None = None
+        max_tokens: int | None = None
+        max_time_ms: float | None = None
 
     @app.post("/api/evaluate")
     async def evaluate_trace(req: EvaluateRequest):
@@ -209,15 +208,17 @@ def create_app(traces_dir: str = "traces") -> FastAPI:
         recent_summaries = []
         for t in recent:
             trace_obj = AgentTrace.model_validate(t)
-            recent_summaries.append({
-                "id": t["id"],
-                "task": t.get("task", "")[:80],
-                "success": t.get("success"),
-                "total_cost": trace_obj.total_cost,
-                "total_tokens": trace_obj.total_tokens,
-                "duration_ms": trace_obj.duration_ms,
-                "start_time": t.get("start_time"),
-            })
+            recent_summaries.append(
+                {
+                    "id": t["id"],
+                    "task": t.get("task", "")[:80],
+                    "success": t.get("success"),
+                    "total_cost": trace_obj.total_cost,
+                    "total_tokens": trace_obj.total_tokens,
+                    "duration_ms": trace_obj.duration_ms,
+                    "start_time": t.get("start_time"),
+                }
+            )
 
         return {
             "total_traces": total,
@@ -240,8 +241,8 @@ def create_app(traces_dir: str = "traces") -> FastAPI:
         llm_responses: list[dict[str, Any]] = []
         tool_calls: list[dict[str, Any]] = []
         metadata: dict[str, Any] = {}
-        success: Optional[bool] = None
-        error: Optional[str] = None
+        success: bool | None = None
+        error: str | None = None
 
     @app.post("/api/traces")
     async def save_trace(req: SaveTraceRequest):
@@ -294,7 +295,9 @@ def create_app(traces_dir: str = "traces") -> FastAPI:
         raise HTTPException(status_code=404, detail="Trace not found")
 
     @app.post("/api/evaluate/batch")
-    async def evaluate_batch(evaluators: list[str] = ["task_completion", "safety", "cost", "tool_usage"]):
+    async def evaluate_batch(
+        evaluators: list[str] = ["task_completion", "safety", "cost", "tool_usage"],
+    ):
         """Evaluate all traces with the given evaluators."""
         traces = _load_traces()
         results = []
@@ -312,13 +315,19 @@ def create_app(traces_dir: str = "traces") -> FastAPI:
         for t in traces:
             trace = AgentTrace.model_validate(t)
             eval_results = [e.evaluate(trace) for e in active_evaluators]
-            results.append({
-                "trace_id": t["id"],
-                "task": t.get("task", ""),
-                "results": [r.model_dump() for r in eval_results],
-                "all_passed": all(r.passed for r in eval_results),
-                "avg_score": sum(r.score for r in eval_results) / len(eval_results) if eval_results else 0,
-            })
+            results.append(
+                {
+                    "trace_id": t["id"],
+                    "task": t.get("task", ""),
+                    "results": [r.model_dump() for r in eval_results],
+                    "all_passed": all(r.passed for r in eval_results),
+                    "avg_score": (
+                        sum(r.score for r in eval_results) / len(eval_results)
+                        if eval_results
+                        else 0
+                    ),
+                }
+            )
 
         return {
             "total": len(results),

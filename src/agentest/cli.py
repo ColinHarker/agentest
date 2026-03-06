@@ -93,11 +93,11 @@ def replay(trace_path: str, strict: bool) -> None:
 
     # Replay all interactions
     for i, response in enumerate(trace.llm_responses):
-        console.print(f"  [{i+1}] LLM: {response.model} - {response.content[:80]}...")
+        console.print(f"  [{i + 1}] LLM: {response.model} - {response.content[:80]}...")
 
     for i, tc in enumerate(trace.tool_calls):
         status = "[green]OK[/green]" if tc.succeeded else f"[red]ERR: {tc.error}[/red]"
-        console.print(f"  [{i+1}] Tool: {tc.name}({tc.arguments}) -> {status}")
+        console.print(f"  [{i + 1}] Tool: {tc.name}({tc.arguments}) -> {status}")
 
     # Generate mock functions
     mocks = replayer.create_tool_mock()
@@ -132,15 +132,17 @@ def summary(trace_dir: str, fmt: str) -> None:
     if fmt == "json":
         data = []
         for t in traces:
-            data.append({
-                "id": t.id,
-                "task": t.task,
-                "success": t.success,
-                "duration_ms": t.duration_ms,
-                "total_cost": t.total_cost,
-                "total_tokens": t.total_tokens,
-                "tool_calls": t.total_tool_calls,
-            })
+            data.append(
+                {
+                    "id": t.id,
+                    "task": t.task,
+                    "success": t.success,
+                    "duration_ms": t.duration_ms,
+                    "total_cost": t.total_cost,
+                    "total_tokens": t.total_tokens,
+                    "tool_calls": t.total_tool_calls,
+                }
+            )
         console.print(json.dumps(data, indent=2))
     else:
         from rich.table import Table
@@ -167,9 +169,11 @@ def summary(trace_dir: str, fmt: str) -> None:
             )
 
         console.print(table)
-        console.print(f"\nTotal: {len(traces)} traces, "
-                      f"{sum(1 for t in traces if t.success):d} passed, "
-                      f"${sum(t.total_cost for t in traces):.4f} total cost")
+        console.print(
+            f"\nTotal: {len(traces)} traces, "
+            f"{sum(1 for t in traces if t.success):d} passed, "
+            f"${sum(t.total_cost for t in traces):.4f} total cost"
+        )
 
 
 @main.command()
@@ -346,7 +350,8 @@ def diff(trace_a: str, trace_b: str, fmt: str) -> None:
     from rich.text import Text
 
     # Summary table
-    table = Table(title=f"Trace Diff: {Path(trace_a).name} vs {Path(trace_b).name}", show_lines=True)
+    title = f"Trace Diff: {Path(trace_a).name} vs {Path(trace_b).name}"
+    table = Table(title=title, show_lines=True)
     table.add_column("Metric", style="cyan")
     table.add_column("Trace A", justify="right")
     table.add_column("Trace B", justify="right")
@@ -368,8 +373,18 @@ def diff(trace_a: str, trace_b: str, fmt: str) -> None:
                 b_str = str(val_b)
                 d_str = f"{delta:+d}" if isinstance(delta, int) else f"{delta:+.0f}"
 
-            delta_style = "red" if delta > 0 and key in ("total_cost", "total_tokens") else "green" if delta < 0 else ""
-            table.add_row(key.replace("_", " ").title(), a_str, b_str, Text(d_str, style=delta_style))
+            if delta > 0 and key in ("total_cost", "total_tokens"):
+                delta_style = "red"
+            elif delta < 0:
+                delta_style = "green"
+            else:
+                delta_style = ""
+            table.add_row(
+                key.replace("_", " ").title(),
+                a_str,
+                b_str,
+                Text(d_str, style=delta_style),
+            )
 
     if "duration_ms" in summary:
         d = summary["duration_ms"]

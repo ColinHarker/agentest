@@ -15,7 +15,8 @@ from __future__ import annotations
 
 import contextlib
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from agentest.core import AgentTrace
 from agentest.recorder.recorder import Recorder
@@ -141,7 +142,9 @@ class AgentestTracer:
 
                 if "MessageOutput" in item_type:
                     agent_name = getattr(item, "agent", None)
-                    agent_label = getattr(agent_name, "name", "assistant") if agent_name else "assistant"
+                    agent_label = (
+                        getattr(agent_name, "name", "assistant") if agent_name else "assistant"
+                    )
                     content = getattr(item, "text", str(item))
                     recorder.record_message(str(agent_label), content)
 

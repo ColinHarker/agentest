@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 from rich.text import Text
 
-from agentest.benchmark.runner import BenchmarkResult
 from agentest.benchmark.comparison import ModelComparison
+from agentest.benchmark.runner import BenchmarkResult
 from agentest.evaluators.base import EvalResult
 
 
@@ -21,7 +19,9 @@ class ConsoleReporter:
         """Initialize the reporter with an optional Rich Console instance."""
         self.console = console or Console()
 
-    def print_eval_results(self, results: list[EvalResult], title: str = "Evaluation Results") -> None:
+    def print_eval_results(
+        self, results: list[EvalResult], title: str = "Evaluation Results"
+    ) -> None:
         """Print evaluation results as a table."""
         table = Table(title=title, show_lines=True)
         table.add_column("Evaluator", style="cyan")
@@ -31,7 +31,9 @@ class ConsoleReporter:
 
         for r in results:
             score_text = f"{r.score:.2f}"
-            status = Text("PASS", style="bold green") if r.passed else Text("FAIL", style="bold red")
+            status = (
+                Text("PASS", style="bold green") if r.passed else Text("FAIL", style="bold red")
+            )
             table.add_row(r.evaluator, score_text, status, r.message)
 
         self.console.print(table)
@@ -41,7 +43,9 @@ class ConsoleReporter:
         # Summary panel
         summary = result.summary()
         summary_text = "\n".join(f"  {k}: {v}" for k, v in summary.items())
-        self.console.print(Panel(summary_text, title=f"Benchmark: {result.name}", border_style="blue"))
+        self.console.print(
+            Panel(summary_text, title=f"Benchmark: {result.name}", border_style="blue")
+        )
 
         # Task details table
         table = Table(title="Task Results", show_lines=True)
@@ -52,7 +56,11 @@ class ConsoleReporter:
         table.add_column("Details")
 
         for task in result.tasks:
-            status = Text("PASS", style="bold green") if task.all_passed else Text("FAIL", style="bold red")
+            status = (
+                Text("PASS", style="bold green")
+                if task.all_passed
+                else Text("FAIL", style="bold red")
+            )
             score = f"{task.avg_score:.3f}" if task.avg_score is not None else "N/A"
             time_ms = f"{task.duration_ms:.0f}"
 

@@ -164,8 +164,7 @@ class LLMJudgeEvaluator(Evaluator):
             for tc in trace.tool_calls[:20]  # Limit to first 20
         )
         messages_summary = "\n".join(
-            f"  [{m.role.value}]: {m.content[:200]}"
-            for m in trace.messages[:20]
+            f"  [{m.role.value}]: {m.content[:200]}" for m in trace.messages[:20]
         )
 
         return f"""You are evaluating an AI agent's performance. Score from 0.0 to 1.0.

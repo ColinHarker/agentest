@@ -14,9 +14,7 @@ class ReplayMismatchError(Exception):
         self.expected = expected
         self.actual = actual
         self.step = step
-        super().__init__(
-            f"Replay mismatch at step {step}: expected {expected!r}, got {actual!r}"
-        )
+        super().__init__(f"Replay mismatch at step {step}: expected {expected!r}, got {actual!r}")
 
 
 class Replayer:
@@ -52,9 +50,8 @@ class Replayer:
     @property
     def is_complete(self) -> bool:
         """Whether all recorded interactions have been replayed."""
-        return (
-            self._llm_index >= len(self.trace.llm_responses)
-            and self._tool_index >= len(self.trace.tool_calls)
+        return self._llm_index >= len(self.trace.llm_responses) and self._tool_index >= len(
+            self.trace.tool_calls
         )
 
     @property
@@ -92,9 +89,7 @@ class Replayer:
         response = self.trace.llm_responses[self._llm_index]
 
         if model and model != response.model:
-            error = ReplayMismatchError(
-                expected=response.model, actual=model, step=self._llm_index
-            )
+            error = ReplayMismatchError(expected=response.model, actual=model, step=self._llm_index)
             self._mismatches.append(error)
             if self.strict:
                 raise error
@@ -129,9 +124,7 @@ class Replayer:
         tool_call = self.trace.tool_calls[self._tool_index]
 
         if name and name != tool_call.name:
-            error = ReplayMismatchError(
-                expected=tool_call.name, actual=name, step=self._tool_index
-            )
+            error = ReplayMismatchError(expected=tool_call.name, actual=name, step=self._tool_index)
             self._mismatches.append(error)
             if self.strict:
                 raise error

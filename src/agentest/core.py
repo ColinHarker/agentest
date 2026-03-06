@@ -240,9 +240,6 @@ def diff_traces(trace_a: AgentTrace, trace_b: AgentTrace) -> dict[str, Any]:
         }
 
     # Tool call comparison by name sequence
-    tools_a = [(tc.name, tc.arguments) for tc in trace_a.tool_calls]
-    tools_b = [(tc.name, tc.arguments) for tc in trace_b.tool_calls]
-
     tool_names_a = [tc.name for tc in trace_a.tool_calls]
     tool_names_b = [tc.name for tc in trace_b.tool_calls]
 

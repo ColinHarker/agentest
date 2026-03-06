@@ -95,14 +95,16 @@ class ModelComparison:
         table = []
 
         for model, score in sorted(scores.items()):
-            table.append({
-                "model": model,
-                "pass_rate": f"{score.pass_rate:.1%}",
-                "avg_score": f"{score.avg_score:.3f}",
-                "total_cost": f"${score.total_cost:.4f}",
-                "avg_latency_ms": f"{score.avg_latency_ms:.0f}",
-                "total_tokens": score.total_tokens,
-            })
+            table.append(
+                {
+                    "model": model,
+                    "pass_rate": f"{score.pass_rate:.1%}",
+                    "avg_score": f"{score.avg_score:.3f}",
+                    "total_cost": f"${score.total_cost:.4f}",
+                    "avg_latency_ms": f"{score.avg_latency_ms:.0f}",
+                    "total_tokens": score.total_tokens,
+                }
+            )
 
         return table
 
@@ -154,7 +156,14 @@ class ModelComparison:
             return ""
 
         output = io.StringIO()
-        columns = ["model", "pass_rate", "avg_score", "total_cost", "avg_latency_ms", "total_tokens"]
+        columns = [
+            "model",
+            "pass_rate",
+            "avg_score",
+            "total_cost",
+            "avg_latency_ms",
+            "total_tokens",
+        ]
         writer = csv.DictWriter(output, fieldnames=columns)
         writer.writeheader()
         for row in table:

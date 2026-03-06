@@ -40,23 +40,22 @@ Usage in tests:
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any
 
 import pytest
 
 from agentest.core import AgentTrace
-from agentest.evaluators.base import CompositeEvaluator, EvalResult
+from agentest.evaluators.base import CompositeEvaluator
 from agentest.evaluators.builtin import (
     CostEvaluator,
-    LatencyEvaluator,
     SafetyEvaluator,
     TaskCompletionEvaluator,
     ToolUsageEvaluator,
 )
 from agentest.mocking.tool_mock import MockToolkit
 from agentest.recorder.recorder import Recorder
-from agentest.recorder.replayer import Replayer
 
 
 def pytest_addoption(parser: Any) -> None:
@@ -86,15 +85,9 @@ def pytest_addoption(parser: Any) -> None:
 
 def pytest_configure(config: Any) -> None:
     """Register custom markers."""
-    config.addinivalue_line(
-        "markers", "agent_eval: mark test as an agent evaluation test"
-    )
-    config.addinivalue_line(
-        "markers", "agent_safety: mark test as an agent safety test"
-    )
-    config.addinivalue_line(
-        "markers", "agent_benchmark: mark test as an agent benchmark test"
-    )
+    config.addinivalue_line("markers", "agent_eval: mark test as an agent evaluation test")
+    config.addinivalue_line("markers", "agent_safety: mark test as an agent safety test")
+    config.addinivalue_line("markers", "agent_benchmark: mark test as an agent benchmark test")
 
 
 @pytest.fixture
@@ -155,9 +148,7 @@ class AgentTraceFile(pytest.File):
 
     def collect(self) -> Generator[AgentTraceItem, None, None]:
         trace = Recorder.load(self.path)
-        yield AgentTraceItem.from_parent(
-            self, name=f"replay:{self.path.stem}", trace=trace
-        )
+        yield AgentTraceItem.from_parent(self, name=f"replay:{self.path.stem}", trace=trace)
 
 
 class AgentTraceItem(pytest.Item):
@@ -180,9 +171,7 @@ class AgentTraceItem(pytest.Item):
 
         if failed:
             failures = "\n".join(f"  {r.evaluator}: {r.message}" for r in failed)
-            raise AgentTraceTestFailure(
-                f"Agent trace evaluation failed:\n{failures}"
-            )
+            raise AgentTraceTestError(f"Agent trace evaluation failed:\n{failures}")
 
     def repr_failure(self, excinfo: Any, **kwargs: Any) -> str:
         return str(excinfo.value)
@@ -191,5 +180,5 @@ class AgentTraceItem(pytest.Item):
         return self.path, None, f"agent trace: {self.name}"
 
 
-class AgentTraceTestFailure(Exception):
+class AgentTraceTestError(Exception):
     """Raised when an agent trace fails evaluation."""

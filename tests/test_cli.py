@@ -1,18 +1,15 @@
 """Tests for the CLI interface."""
 
 import json
-import os
 from pathlib import Path
 
-import yaml
 from click.testing import CliRunner
 
 from agentest.cli import main
-from agentest.core import AgentTrace, LLMResponse, Message, Role, ToolCall
 from agentest.recorder.recorder import Recorder
 
-
 # ---- Helpers ----
+
 
 def _create_trace_file(directory: Path, name: str = "trace.yaml", success: bool = True) -> Path:
     """Create a minimal trace YAML file and return its path."""
@@ -29,13 +26,14 @@ def _create_trace_file(directory: Path, name: str = "trace.yaml", success: bool 
         arguments={"path": "test.txt"},
         result="file contents",
     )
-    trace = recorder.finalize(success=success)
+    recorder.finalize(success=success)
     path = directory / name
     recorder.save(path)
     return path
 
 
 # ---- evaluate command ----
+
 
 def test_evaluate_passing_trace(tmp_path):
     trace_path = _create_trace_file(tmp_path)
@@ -75,6 +73,7 @@ def test_evaluate_with_cost_budget(tmp_path):
 
 # ---- replay command ----
 
+
 def test_replay_successful_trace(tmp_path):
     trace_path = _create_trace_file(tmp_path)
     runner = CliRunner()
@@ -93,6 +92,7 @@ def test_replay_failed_trace(tmp_path):
 
 
 # ---- summary command ----
+
 
 def test_summary_table(tmp_path):
     _create_trace_file(tmp_path, name="trace1.yaml")
@@ -123,9 +123,10 @@ def test_summary_empty_dir(tmp_path):
 
 # ---- init command ----
 
+
 def test_init_creates_directories(tmp_path):
     runner = CliRunner()
-    with runner.isolated_filesystem(temp_dir=tmp_path) as td:
+    with runner.isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(main, ["init"])
         assert result.exit_code == 0
         assert Path("traces").is_dir()
@@ -143,6 +144,7 @@ def test_init_idempotent(tmp_path):
 
 
 # ---- diff command ----
+
 
 def test_diff_table(tmp_path):
     path_a = _create_trace_file(tmp_path, name="a.yaml")
@@ -165,6 +167,7 @@ def test_diff_json(tmp_path):
 
 
 # ---- version ----
+
 
 def test_version():
     runner = CliRunner()

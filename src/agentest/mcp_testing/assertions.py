@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from agentest.mcp_testing.server_tester import MCPTestResult
 
 
@@ -36,9 +34,7 @@ class MCPAssertions:
         if not matching:
             raise AssertionError(f"No test found with name {test_name!r}")
         if not matching[0].passed:
-            raise AssertionError(
-                f"Test {test_name!r} failed: {matching[0].error}"
-            )
+            raise AssertionError(f"Test {test_name!r} failed: {matching[0].error}")
         return self
 
     def has_tool(self, tool_name: str) -> MCPAssertions:
@@ -52,9 +48,7 @@ class MCPAssertions:
         tool_names = [t.get("name") for t in tools]
 
         if tool_name not in tool_names:
-            raise AssertionError(
-                f"Tool {tool_name!r} not found. Available: {tool_names}"
-            )
+            raise AssertionError(f"Tool {tool_name!r} not found. Available: {tool_names}")
         return self
 
     def tool_count_at_least(self, n: int) -> MCPAssertions:
@@ -67,32 +61,21 @@ class MCPAssertions:
         tools = response.get("result", {}).get("tools", [])
 
         if len(tools) < n:
-            raise AssertionError(
-                f"Expected at least {n} tools, found {len(tools)}"
-            )
+            raise AssertionError(f"Expected at least {n} tools, found {len(tools)}")
         return self
 
     def max_latency(self, max_ms: float) -> MCPAssertions:
         """Assert all tests completed within the given latency."""
         slow = [r for r in self.results if r.duration_ms > max_ms]
         if slow:
-            details = "\n".join(
-                f"  - {r.test_name}: {r.duration_ms:.0f}ms" for r in slow
-            )
-            raise AssertionError(
-                f"Tests exceeded {max_ms:.0f}ms latency:\n{details}"
-            )
+            details = "\n".join(f"  - {r.test_name}: {r.duration_ms:.0f}ms" for r in slow)
+            raise AssertionError(f"Tests exceeded {max_ms:.0f}ms latency:\n{details}")
         return self
 
     def no_errors(self) -> MCPAssertions:
         """Assert no tests had errors (excluding 'not supported' errors)."""
-        errors = [
-            r for r in self.results
-            if r.error and "Not supported" not in r.error
-        ]
+        errors = [r for r in self.results if r.error and "Not supported" not in r.error]
         if errors:
-            details = "\n".join(
-                f"  - {r.test_name}: {r.error}" for r in errors
-            )
+            details = "\n".join(f"  - {r.test_name}: {r.error}" for r in errors)
             raise AssertionError(f"Tests had errors:\n{details}")
         return self

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Coroutine
+from typing import Any
 
-from agentest.core import AgentTrace, TraceSession
+from agentest.core import AgentTrace
 from agentest.evaluators.base import CompositeEvaluator, EvalResult, Evaluator
 
 
@@ -192,9 +193,7 @@ class BenchmarkRunner:
             async with semaphore:
                 return await self._run_task_async(task, composite, **kwargs)
 
-        task_results = await asyncio.gather(
-            *(run_with_limit(task) for task in self.tasks)
-        )
+        task_results = await asyncio.gather(*(run_with_limit(task) for task in self.tasks))
 
         total_time = (time.time() - start) * 1000
 

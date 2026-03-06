@@ -1,16 +1,13 @@
 """Tests for the FastAPI server application."""
 
-import json
-from pathlib import Path
-
 import pytest
 from fastapi.testclient import TestClient
 
 from agentest.recorder.recorder import Recorder
 from agentest.server.app import create_app
 
-
 # ---- Fixtures ----
+
 
 @pytest.fixture
 def traces_dir(tmp_path):
@@ -53,6 +50,7 @@ def populated_client(traces_dir):
 
 # ---- GET /api/traces (empty) ----
 
+
 def test_list_traces_empty(client):
     response = client.get("/api/traces")
     assert response.status_code == 200
@@ -63,23 +61,31 @@ def test_list_traces_empty(client):
 
 # ---- POST /api/traces (save) ----
 
+
 def test_save_trace(client):
-    response = client.post("/api/traces", json={
-        "task": "My test task",
-        "messages": [{"role": "user", "content": "Hello"}],
-        "llm_responses": [{
-            "model": "claude-sonnet-4-6",
-            "content": "Hi",
-            "input_tokens": 50,
-            "output_tokens": 10,
-        }],
-        "tool_calls": [{
-            "name": "read_file",
-            "arguments": {"path": "test.txt"},
-            "result": "contents",
-        }],
-        "success": True,
-    })
+    response = client.post(
+        "/api/traces",
+        json={
+            "task": "My test task",
+            "messages": [{"role": "user", "content": "Hello"}],
+            "llm_responses": [
+                {
+                    "model": "claude-sonnet-4-6",
+                    "content": "Hi",
+                    "input_tokens": 50,
+                    "output_tokens": 10,
+                }
+            ],
+            "tool_calls": [
+                {
+                    "name": "read_file",
+                    "arguments": {"path": "test.txt"},
+                    "result": "contents",
+                }
+            ],
+            "success": True,
+        },
+    )
     assert response.status_code == 200
     data = response.json()
     assert "id" in data
@@ -89,10 +95,13 @@ def test_save_trace(client):
 
 def test_save_and_list_trace(client):
     """Save a trace then verify it appears in the list."""
-    client.post("/api/traces", json={
-        "task": "Listed task",
-        "success": True,
-    })
+    client.post(
+        "/api/traces",
+        json={
+            "task": "Listed task",
+            "success": True,
+        },
+    )
     response = client.get("/api/traces")
     data = response.json()
     assert data["total"] == 1
@@ -100,6 +109,7 @@ def test_save_and_list_trace(client):
 
 
 # ---- GET /api/traces/{id} ----
+
 
 def test_get_trace_by_id(populated_client):
     client, trace = populated_client
@@ -119,12 +129,16 @@ def test_get_trace_not_found(client):
 
 # ---- POST /api/evaluate ----
 
+
 def test_evaluate_trace(populated_client):
     client, trace = populated_client
-    response = client.post("/api/evaluate", json={
-        "trace_id": trace.id,
-        "evaluators": ["task_completion", "safety", "tool_usage"],
-    })
+    response = client.post(
+        "/api/evaluate",
+        json={
+            "trace_id": trace.id,
+            "evaluators": ["task_completion", "safety", "tool_usage"],
+        },
+    )
     assert response.status_code == 200
     data = response.json()
     assert data["trace_id"] == trace.id
@@ -136,14 +150,18 @@ def test_evaluate_trace(populated_client):
 
 
 def test_evaluate_trace_not_found(client):
-    response = client.post("/api/evaluate", json={
-        "trace_id": "nonexistent",
-        "evaluators": ["task_completion"],
-    })
+    response = client.post(
+        "/api/evaluate",
+        json={
+            "trace_id": "nonexistent",
+            "evaluators": ["task_completion"],
+        },
+    )
     assert response.status_code == 404
 
 
 # ---- GET /api/dashboard ----
+
 
 def test_dashboard_empty(client):
     response = client.get("/api/dashboard")
@@ -169,6 +187,7 @@ def test_dashboard_with_traces(populated_client):
 
 # ---- DELETE /api/traces/{id} ----
 
+
 def test_delete_trace(populated_client):
     client, trace = populated_client
     response = client.delete(f"/api/traces/{trace.id}")
@@ -188,6 +207,7 @@ def test_delete_trace_not_found(client):
 
 # ---- GET / (index) ----
 
+
 def test_index_returns_html(client):
     response = client.get("/")
     assert response.status_code == 200
@@ -196,6 +216,7 @@ def test_index_returns_html(client):
 
 
 # ---- POST /api/evaluate/batch ----
+
 
 def test_evaluate_batch_empty(client):
     response = client.post("/api/evaluate/batch")

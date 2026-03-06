@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import subprocess
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -115,11 +114,14 @@ class MCPServerTester:
     def test_initialize(self) -> MCPTestResult:
         """Test MCP server initialization."""
         start = time.time()
-        request = self._make_request("initialize", {
-            "protocolVersion": "2024-11-05",
-            "capabilities": {},
-            "clientInfo": {"name": "agentest", "version": "0.1.0"},
-        })
+        request = self._make_request(
+            "initialize",
+            {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "agentest", "version": "0.1.0"},
+            },
+        )
 
         response = self._send_request(request)
         duration = (time.time() - start) * 1000
@@ -145,7 +147,8 @@ class MCPServerTester:
             duration_ms=duration,
             request=request,
             response=response,
-            error=None if (has_version and has_capabilities)
+            error=None
+            if (has_version and has_capabilities)
             else "Missing protocolVersion or capabilities in response",
         )
 
@@ -187,10 +190,13 @@ class MCPServerTester:
     ) -> MCPTestResult:
         """Test a specific tool call."""
         start = time.time()
-        request = self._make_request("tools/call", {
-            "name": tool_name,
-            "arguments": arguments or {},
-        })
+        request = self._make_request(
+            "tools/call",
+            {
+                "name": tool_name,
+                "arguments": arguments or {},
+            },
+        )
 
         response = self._send_request(request)
         duration = (time.time() - start) * 1000
@@ -238,7 +244,7 @@ class MCPServerTester:
             duration_ms=duration,
             request=request,
             response=response,
-            error=None if passed else f"Result mismatch",
+            error=None if passed else "Result mismatch",
         )
 
     def test_list_resources(self) -> MCPTestResult:
@@ -298,10 +304,7 @@ class MCPServerTester:
 
             if has_schema:
                 schema = tool["inputSchema"]
-                valid_schema = (
-                    isinstance(schema, dict)
-                    and schema.get("type") == "object"
-                )
+                valid_schema = isinstance(schema, dict) and schema.get("type") == "object"
 
             duration = (time.time() - start) * 1000
             issues = []
@@ -314,11 +317,13 @@ class MCPServerTester:
             if not valid_schema:
                 issues.append("invalid inputSchema")
 
-            results.append(MCPTestResult(
-                test_name=f"schema:{name}",
-                passed=has_name and has_description and valid_schema,
-                duration_ms=duration,
-                error="; ".join(issues) if issues else None,
-            ))
+            results.append(
+                MCPTestResult(
+                    test_name=f"schema:{name}",
+                    passed=has_name and has_description and valid_schema,
+                    duration_ms=duration,
+                    error="; ".join(issues) if issues else None,
+                )
+            )
 
         return results

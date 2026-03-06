@@ -46,8 +46,7 @@ def record_crew(
         from crewai import Crew
     except ImportError:
         raise ImportError(
-            "CrewAI integration requires crewai. "
-            "Install with: pip install agentest[crewai]"
+            "CrewAI integration requires crewai. Install with: pip install agentest[crewai]"
         )
 
     if not isinstance(crew, Crew):

@@ -2,19 +2,18 @@
 
 import json
 from io import StringIO
-from pathlib import Path
 
 from rich.console import Console
 
-from agentest.core import AgentTrace, LLMResponse, ToolCall
-from agentest.evaluators.base import EvalResult
-from agentest.benchmark.runner import BenchmarkResult, TaskResult
 from agentest.benchmark.comparison import ModelComparison
+from agentest.benchmark.runner import BenchmarkResult, TaskResult
+from agentest.core import AgentTrace, LLMResponse
+from agentest.evaluators.base import EvalResult
 from agentest.reporters.console import ConsoleReporter
 from agentest.reporters.json_reporter import JSONReporter
 
-
 # ---- Helpers ----
+
 
 def _make_eval_results():
     return [
@@ -25,7 +24,14 @@ def _make_eval_results():
 
 def _make_benchmark_result():
     trace = AgentTrace(task="test")
-    trace.llm_responses.append(LLMResponse(model="test", input_tokens=100, output_tokens=50, total_tokens=150))
+    trace.llm_responses.append(
+        LLMResponse(
+            model="test",
+            input_tokens=100,
+            output_tokens=50,
+            total_tokens=150,
+        )
+    )
     trace.finalize(success=True)
 
     task1 = TaskResult(
@@ -52,6 +58,7 @@ def _make_comparison():
 
 
 # ---- ConsoleReporter ----
+
 
 def test_console_print_eval_results():
     buf = StringIO()
@@ -93,6 +100,7 @@ def test_console_print_comparison_empty():
 
 
 # ---- JSONReporter ----
+
 
 def test_json_eval_results_to_dict():
     results = _make_eval_results()

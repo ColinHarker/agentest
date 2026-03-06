@@ -2,15 +2,15 @@
 
 import json
 import subprocess
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agentest.mcp_testing.server_tester import MCPServerTester, MCPTestResult
 from agentest.mcp_testing.assertions import MCPAssertions
-
+from agentest.mcp_testing.server_tester import MCPServerTester, MCPTestResult
 
 # ---- MCPTestResult ----
+
 
 def test_mcp_test_result_repr_pass():
     r = MCPTestResult(test_name="init", passed=True, duration_ms=42.5)
@@ -24,6 +24,7 @@ def test_mcp_test_result_repr_fail():
 
 
 # ---- MCPServerTester._make_request ----
+
 
 def test_make_request_basic():
     tester = MCPServerTester(command=["echo"])
@@ -49,15 +50,18 @@ def test_make_request_increments_id():
 
 # ---- MCPServerTester.test_initialize ----
 
+
 def test_initialize_success():
-    response = json.dumps({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "result": {
-            "protocolVersion": "2024-11-05",
-            "capabilities": {"tools": {}},
-        },
-    })
+    response = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {"tools": {}},
+            },
+        }
+    )
     mock_result = MagicMock()
     mock_result.returncode = 0
     mock_result.stdout = response + "\n"
@@ -88,11 +92,13 @@ def test_initialize_missing_fields():
 
 
 def test_initialize_error_response():
-    response = json.dumps({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "error": {"code": -1, "message": "crash"},
-    })
+    response = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "error": {"code": -1, "message": "crash"},
+        }
+    )
     mock_result = MagicMock()
     mock_result.returncode = 0
     mock_result.stdout = response + "\n"
@@ -108,12 +114,15 @@ def test_initialize_error_response():
 
 # ---- MCPServerTester.test_list_tools ----
 
+
 def test_list_tools_success():
-    response = json.dumps({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "result": {"tools": [{"name": "read_file"}, {"name": "write_file"}]},
-    })
+    response = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {"tools": [{"name": "read_file"}, {"name": "write_file"}]},
+        }
+    )
     mock_result = MagicMock()
     mock_result.returncode = 0
     mock_result.stdout = response + "\n"
@@ -128,6 +137,7 @@ def test_list_tools_success():
 
 
 # ---- Error handling ----
+
 
 def test_timeout_handling():
     with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="x", timeout=5)):
@@ -177,17 +187,20 @@ def test_nonzero_exit_no_stdout():
 
 # ---- MCPAssertions ----
 
+
 def _make_results(passed_list, names=None):
     """Helper to create test results."""
     results = []
     for i, passed in enumerate(passed_list):
         name = names[i] if names else f"test_{i}"
-        results.append(MCPTestResult(
-            test_name=name,
-            passed=passed,
-            duration_ms=10.0,
-            error=None if passed else f"{name} failed",
-        ))
+        results.append(
+            MCPTestResult(
+                test_name=name,
+                passed=passed,
+                duration_ms=10.0,
+                error=None if passed else f"{name} failed",
+            )
+        )
     return results
 
 
@@ -219,14 +232,16 @@ def test_assertions_test_passed_not_found():
 
 
 def test_assertions_has_tool():
-    results = [MCPTestResult(
-        test_name="list_tools",
-        passed=True,
-        duration_ms=5.0,
-        response={
-            "result": {"tools": [{"name": "read_file"}, {"name": "write_file"}]},
-        },
-    )]
+    results = [
+        MCPTestResult(
+            test_name="list_tools",
+            passed=True,
+            duration_ms=5.0,
+            response={
+                "result": {"tools": [{"name": "read_file"}, {"name": "write_file"}]},
+            },
+        )
+    ]
     a = MCPAssertions(results)
     assert a.has_tool("read_file") is a
 
@@ -235,12 +250,14 @@ def test_assertions_has_tool():
 
 
 def test_assertions_tool_count_at_least():
-    results = [MCPTestResult(
-        test_name="list_tools",
-        passed=True,
-        duration_ms=5.0,
-        response={"result": {"tools": [{"name": "a"}, {"name": "b"}]}},
-    )]
+    results = [
+        MCPTestResult(
+            test_name="list_tools",
+            passed=True,
+            duration_ms=5.0,
+            response={"result": {"tools": [{"name": "a"}, {"name": "b"}]}},
+        )
+    ]
     a = MCPAssertions(results)
     assert a.tool_count_at_least(2) is a
     assert a.tool_count_at_least(1) is a
@@ -276,12 +293,14 @@ def test_assertions_no_errors():
 
 
 def test_assertions_chaining():
-    results = [MCPTestResult(
-        test_name="list_tools",
-        passed=True,
-        duration_ms=5.0,
-        response={"result": {"tools": [{"name": "a"}]}},
-    )]
+    results = [
+        MCPTestResult(
+            test_name="list_tools",
+            passed=True,
+            duration_ms=5.0,
+            response={"result": {"tools": [{"name": "a"}]}},
+        )
+    ]
     # Chained calls should all return self
     a = (
         MCPAssertions(results)

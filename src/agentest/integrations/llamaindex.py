@@ -24,7 +24,7 @@ from agentest.core import AgentTrace
 from agentest.recorder.recorder import Recorder
 
 try:
-    from llama_index.core.callbacks import CallbackManager, CBEventType, EventPayload
+    from llama_index.core.callbacks import CBEventType, EventPayload
     from llama_index.core.callbacks.base_handler import BaseCallbackHandler
 except ImportError:
     raise ImportError(
@@ -53,7 +53,9 @@ class AgentestHandler(BaseCallbackHandler):
             event_starts_to_ignore=[],
             event_ends_to_ignore=[],
         )
-        self._recorder = Recorder(task=task, metadata={"framework": "llamaindex", **(metadata or {})})
+        self._recorder = Recorder(
+            task=task, metadata={"framework": "llamaindex", **(metadata or {})}
+        )
         self._event_starts: dict[str, float] = {}
         self._finalized = False
 

@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from agentest.benchmark.runner import BenchmarkResult
 from agentest.benchmark.comparison import ModelComparison
+from agentest.benchmark.runner import BenchmarkResult
 from agentest.evaluators.base import EvalResult
 
 

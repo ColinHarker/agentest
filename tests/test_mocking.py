@@ -15,9 +15,12 @@ def test_tool_mock_simple_return():
 def test_tool_mock_conditional():
     mock = (
         ToolMock("search")
-        .when(query="python").returns(["py_result"])
-        .when(query="rust").returns(["rs_result"])
-        .otherwise().returns([])
+        .when(query="python")
+        .returns(["py_result"])
+        .when(query="rust")
+        .returns(["rs_result"])
+        .otherwise()
+        .returns([])
     )
 
     assert mock(query="python") == ["py_result"]
@@ -46,8 +49,10 @@ def test_tool_mock_raises():
 def test_tool_mock_conditional_error():
     mock = (
         ToolMock("write")
-        .when(path="/etc/passwd").raises(PermissionError("no"))
-        .otherwise().returns(True)
+        .when(path="/etc/passwd")
+        .raises(PermissionError("no"))
+        .otherwise()
+        .returns(True)
     )
 
     assert mock(path="/tmp/test.txt") is True
@@ -77,8 +82,10 @@ def test_tool_mock_assertions():
 def test_tool_mock_regex_matching():
     mock = (
         ToolMock("search")
-        .when(query=r"python.*async").returns(["async_result"])
-        .otherwise().returns([])
+        .when(query=r"python.*async")
+        .returns(["async_result"])
+        .otherwise()
+        .returns([])
     )
 
     assert mock(query="python async await") == ["async_result"]

@@ -1,18 +1,16 @@
 """Tests for the pytest plugin fixtures and configuration."""
 
-import pytest
-
-from agentest.mocking.tool_mock import MockToolkit
-from agentest.recorder.recorder import Recorder
 from agentest.evaluators.base import CompositeEvaluator
+from agentest.mocking.tool_mock import MockToolkit
 from agentest.pytest_plugin import (
-    pytest_configure,
+    AgentTraceTestError,
     pytest_addoption,
-    AgentTraceTestFailure,
+    pytest_configure,
 )
-
+from agentest.recorder.recorder import Recorder
 
 # ---- Fixtures used as test parameters (the correct way) ----
+
 
 def test_agent_recorder_fixture(agent_recorder):
     """The agent_recorder fixture should provide a Recorder."""
@@ -23,7 +21,12 @@ def test_agent_recorder_fixture(agent_recorder):
 def test_agent_recorder_records(agent_recorder):
     """The Recorder from the fixture should be fully functional."""
     agent_recorder.record_message("user", "Hello")
-    agent_recorder.record_llm_response(model="test-model", content="Hi", input_tokens=10, output_tokens=5)
+    agent_recorder.record_llm_response(
+        model="test-model",
+        content="Hi",
+        input_tokens=10,
+        output_tokens=5,
+    )
     agent_recorder.record_tool_call(name="read_file", arguments={"path": "a.txt"}, result="data")
     trace = agent_recorder.finalize(success=True)
     assert len(trace.messages) == 1
@@ -57,11 +60,14 @@ def test_eval_suite_evaluates_trace(agent_eval_suite):
 
 # ---- pytest_configure ----
 
+
 def test_pytest_configure_registers_markers():
     """pytest_configure should register custom markers."""
+
     class FakeConfig:
         def __init__(self):
             self._ini_values = []
+
         def addinivalue_line(self, name, value):
             self._ini_values.append((name, value))
 
@@ -76,17 +82,21 @@ def test_pytest_configure_registers_markers():
 
 # ---- pytest_addoption ----
 
+
 def test_pytest_addoption_registers_options():
     """pytest_addoption should add CLI options."""
+
     class FakeGroup:
         def __init__(self):
             self.options = []
+
         def addoption(self, *args, **kwargs):
             self.options.append(args[0])
 
     class FakeParser:
         def __init__(self):
             self._groups = {}
+
         def getgroup(self, name, desc=""):
             if name not in self._groups:
                 self._groups[name] = FakeGroup()
@@ -100,9 +110,10 @@ def test_pytest_addoption_registers_options():
     assert "--agentest-max-tokens" in group.options
 
 
-# ---- AgentTraceTestFailure ----
+# ---- AgentTraceTestError ----
+
 
 def test_agent_trace_test_failure():
-    """AgentTraceTestFailure should be a proper exception."""
-    err = AgentTraceTestFailure("something failed")
+    """AgentTraceTestError should be a proper exception."""
+    err = AgentTraceTestError("something failed")
     assert "something failed" in str(err)

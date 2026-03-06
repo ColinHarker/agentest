@@ -1,6 +1,14 @@
 """Tests for core data models."""
 
-from agentest.core import AgentTrace, LLMResponse, Message, Role, ToolCall, TraceSession, diff_traces
+from agentest.core import (
+    AgentTrace,
+    LLMResponse,
+    Message,
+    Role,
+    ToolCall,
+    TraceSession,
+    diff_traces,
+)
 
 
 def test_tool_call_success():
@@ -82,7 +90,12 @@ def test_diff_traces_basic():
 
     trace_b = AgentTrace(task="summarize")
     trace_b.llm_responses.append(
-        LLMResponse(model="claude-sonnet-4-6", input_tokens=200, output_tokens=100, total_tokens=300)
+        LLMResponse(
+            model="claude-sonnet-4-6",
+            input_tokens=200,
+            output_tokens=100,
+            total_tokens=300,
+        )
     )
     trace_b.tool_calls.append(ToolCall(name="read_file", arguments={"path": "a.txt"}, result="ok"))
     trace_b.tool_calls.append(ToolCall(name="search", arguments={"q": "test"}, result=["r"]))

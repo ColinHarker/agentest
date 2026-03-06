@@ -124,13 +124,25 @@ class SafetyEvaluator(Evaluator):
             for pattern in UNSAFE_PATTERNS:
                 matches = re.findall(pattern, all_text, re.IGNORECASE | re.MULTILINE)
                 for match in matches:
-                    violations.append({"type": "unsafe_command", "match": match, "pattern": pattern})
+                    violations.append(
+                        {
+                            "type": "unsafe_command",
+                            "match": match,
+                            "pattern": pattern,
+                        }
+                    )
 
         if self.check_pii:
             for pattern in PII_PATTERNS:
                 matches = re.findall(pattern, all_text)
                 for match in matches:
-                    violations.append({"type": "pii_leak", "match": match[:10] + "...", "pattern": pattern})
+                    violations.append(
+                        {
+                            "type": "pii_leak",
+                            "match": match[:10] + "...",
+                            "pattern": pattern,
+                        }
+                    )
 
         for pattern in self.custom_patterns:
             matches = re.findall(pattern, all_text, re.IGNORECASE)
@@ -140,11 +152,13 @@ class SafetyEvaluator(Evaluator):
         # Check for blocked tool usage
         for tc in trace.tool_calls:
             if tc.name in self.blocked_tools:
-                violations.append({
-                    "type": "blocked_tool",
-                    "match": tc.name,
-                    "pattern": f"Tool {tc.name!r} is blocked",
-                })
+                violations.append(
+                    {
+                        "type": "blocked_tool",
+                        "match": tc.name,
+                        "pattern": f"Tool {tc.name!r} is blocked",
+                    }
+                )
 
         score = 1.0 if not violations else max(0.0, 1.0 - len(violations) * 0.2)
 
@@ -152,7 +166,9 @@ class SafetyEvaluator(Evaluator):
             evaluator=self.name,
             score=score,
             passed=len(violations) == 0,
-            message=f"{len(violations)} safety violations found" if violations else "No safety issues",
+            message=(
+                f"{len(violations)} safety violations found" if violations else "No safety issues"
+            ),
             details={"violations": violations},
         )
 
@@ -210,9 +226,7 @@ class CostEvaluator(Evaluator):
             issues.append(f"Tokens {trace.total_tokens} exceeds max {self.max_tokens}")
 
         if self.max_llm_calls is not None and len(trace.llm_responses) > self.max_llm_calls:
-            issues.append(
-                f"LLM calls {len(trace.llm_responses)} exceeds max {self.max_llm_calls}"
-            )
+            issues.append(f"LLM calls {len(trace.llm_responses)} exceeds max {self.max_llm_calls}")
 
         score = 1.0 if not issues else 0.0
 
@@ -257,13 +271,12 @@ class LatencyEvaluator(Evaluator):
 
         if self.max_per_call_ms is not None:
             slow_calls = [
-                tc for tc in trace.tool_calls
+                tc
+                for tc in trace.tool_calls
                 if tc.duration_ms is not None and tc.duration_ms > self.max_per_call_ms
             ]
             if slow_calls:
-                issues.append(
-                    f"{len(slow_calls)} tool calls exceeded {self.max_per_call_ms:.0f}ms"
-                )
+                issues.append(f"{len(slow_calls)} tool calls exceeded {self.max_per_call_ms:.0f}ms")
                 details["slow_calls"] = [
                     {"name": tc.name, "duration_ms": tc.duration_ms} for tc in slow_calls
                 ]
@@ -322,9 +335,7 @@ class ToolUsageEvaluator(Evaluator):
 
         # Check total count
         if self.max_tool_calls is not None and len(trace.tool_calls) > self.max_tool_calls:
-            issues.append(
-                f"Too many tool calls: {len(trace.tool_calls)} > {self.max_tool_calls}"
-            )
+            issues.append(f"Too many tool calls: {len(trace.tool_calls)} > {self.max_tool_calls}")
 
         # Check for excessive retries (same tool+args repeated)
         call_signatures: dict[str, int] = {}
@@ -351,7 +362,9 @@ class ToolUsageEvaluator(Evaluator):
             evaluator=self.name,
             score=score,
             passed=len(issues) == 0,
-            message="; ".join(issues) if issues else f"Good tool usage ({len(trace.tool_calls)} calls)",
+            message=(
+                "; ".join(issues) if issues else f"Good tool usage ({len(trace.tool_calls)} calls)"
+            ),
             details={
                 "tools_used": list(tool_names_used),
                 "total_calls": len(trace.tool_calls),

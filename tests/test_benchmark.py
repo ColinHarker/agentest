@@ -1,10 +1,7 @@
 """Tests for benchmarking and model comparison."""
 
-import asyncio
 import tempfile
 from pathlib import Path
-
-import pytest
 
 from agentest.benchmark.comparison import ModelComparison
 from agentest.benchmark.runner import BenchmarkResult, BenchmarkRunner, BenchmarkTask, TaskResult
@@ -15,7 +12,13 @@ from agentest.evaluators.builtin import TaskCompletionEvaluator
 def _make_successful_trace(model: str = "test") -> AgentTrace:
     trace = AgentTrace(task="test task")
     trace.llm_responses.append(
-        LLMResponse(model=model, content="done", input_tokens=100, output_tokens=50, total_tokens=150)
+        LLMResponse(
+            model=model,
+            content="done",
+            input_tokens=100,
+            output_tokens=50,
+            total_tokens=150,
+        )
     )
     trace.tool_calls.append(ToolCall(name="tool1", result="ok"))
     trace.finalize(success=True)
@@ -28,11 +31,13 @@ def test_benchmark_runner():
         evaluators=[TaskCompletionEvaluator(min_messages=0)],
     )
 
-    runner.add_task(BenchmarkTask(
-        name="task1",
-        description="Test task 1",
-        task_fn=lambda: _make_successful_trace(),
-    ))
+    runner.add_task(
+        BenchmarkTask(
+            name="task1",
+            description="Test task 1",
+            task_fn=lambda: _make_successful_trace(),
+        )
+    )
 
     result = runner.run()
     assert result.total_tasks == 1
@@ -69,11 +74,13 @@ def test_benchmark_runner_exception():
 
 def test_benchmark_run_n_times():
     runner = BenchmarkRunner(name="repeat_bench")
-    runner.add_task(BenchmarkTask(
-        name="task",
-        description="Repeatable",
-        task_fn=lambda: _make_successful_trace(),
-    ))
+    runner.add_task(
+        BenchmarkTask(
+            name="task",
+            description="Repeatable",
+            task_fn=lambda: _make_successful_trace(),
+        )
+    )
 
     results = runner.run_n_times(n=3)
     assert len(results) == 3
@@ -216,16 +223,20 @@ async def test_benchmark_runner_async():
         evaluators=[],
     )
 
-    runner.add_task(BenchmarkTask(
-        name="task1",
-        description="Task 1",
-        task_fn=lambda: _make_successful_trace(),
-    ))
-    runner.add_task(BenchmarkTask(
-        name="task2",
-        description="Task 2",
-        task_fn=lambda: _make_successful_trace(),
-    ))
+    runner.add_task(
+        BenchmarkTask(
+            name="task1",
+            description="Task 1",
+            task_fn=lambda: _make_successful_trace(),
+        )
+    )
+    runner.add_task(
+        BenchmarkTask(
+            name="task2",
+            description="Task 2",
+            task_fn=lambda: _make_successful_trace(),
+        )
+    )
 
     result = await runner.run_async(max_concurrency=2)
     assert result.total_tasks == 2
@@ -237,11 +248,13 @@ async def test_benchmark_runner_async_with_coroutine():
         return _make_successful_trace()
 
     runner = BenchmarkRunner(name="async_coro_bench")
-    runner.add_task(BenchmarkTask(
-        name="async_task",
-        description="Async task",
-        task_fn=async_task,
-    ))
+    runner.add_task(
+        BenchmarkTask(
+            name="async_task",
+            description="Async task",
+            task_fn=async_task,
+        )
+    )
 
     result = await runner.run_async()
     assert result.total_tasks == 1

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
-from typing import Any, Callable
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -126,8 +127,7 @@ class ToolMock:
         if self._sequence:
             if self._sequence_index >= len(self._sequence):
                 raise IndexError(
-                    f"ToolMock {self.name!r}: exhausted sequence "
-                    f"after {len(self._sequence)} calls"
+                    f"ToolMock {self.name!r}: exhausted sequence after {len(self._sequence)} calls"
                 )
             result = self._sequence[self._sequence_index]
             self._sequence_index += 1
@@ -183,8 +183,7 @@ class ToolMock:
     def was_called_with(self, **kwargs: Any) -> bool:
         """Return True if any call matched the given keyword arguments."""
         return any(
-            all(call.arguments.get(k) == v for k, v in kwargs.items())
-            for call in self._calls
+            all(call.arguments.get(k) == v for k, v in kwargs.items()) for call in self._calls
         )
 
     def assert_called(self) -> None:
@@ -244,8 +243,7 @@ class MockToolkit:
         """Execute a mocked tool by name."""
         if name not in self._mocks:
             raise KeyError(
-                f"No mock registered for tool {name!r}. "
-                f"Available: {list(self._mocks.keys())}"
+                f"No mock registered for tool {name!r}. Available: {list(self._mocks.keys())}"
             )
         return self._mocks[name](**kwargs)
 

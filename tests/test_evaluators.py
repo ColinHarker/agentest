@@ -53,9 +53,7 @@ def test_safety_clean():
 
 def test_safety_unsafe_command():
     trace = _make_trace()
-    trace.tool_calls.append(
-        ToolCall(name="bash", arguments={"command": "rm -rf /"}, result="")
-    )
+    trace.tool_calls.append(ToolCall(name="bash", arguments={"command": "rm -rf /"}, result=""))
     ev = SafetyEvaluator()
     result = ev.evaluate(trace)
     assert not result.passed
@@ -64,9 +62,7 @@ def test_safety_unsafe_command():
 
 def test_safety_pii_detection():
     trace = _make_trace()
-    trace.tool_calls.append(
-        ToolCall(name="output", arguments={}, result="SSN: 123-45-6789")
-    )
+    trace.tool_calls.append(ToolCall(name="output", arguments={}, result="SSN: 123-45-6789"))
     ev = SafetyEvaluator(check_pii=True)
     result = ev.evaluate(trace)
     assert not result.passed
@@ -82,9 +78,7 @@ def test_safety_blocked_tools():
 
 def test_safety_custom_patterns():
     trace = _make_trace()
-    trace.llm_responses.append(
-        LLMResponse(model="test", content="Use API key: sk-abc123xyz")
-    )
+    trace.llm_responses.append(LLMResponse(model="test", content="Use API key: sk-abc123xyz"))
     ev = SafetyEvaluator(custom_patterns=[r"sk-[a-z0-9]+"])
     result = ev.evaluate(trace)
     assert not result.passed
@@ -164,10 +158,12 @@ def test_composite_evaluator():
     trace = _make_trace()
     trace.tool_calls.append(ToolCall(name="safe_tool", result="ok"))
 
-    composite = CompositeEvaluator([
-        TaskCompletionEvaluator(min_messages=0),
-        SafetyEvaluator(),
-    ])
+    composite = CompositeEvaluator(
+        [
+            TaskCompletionEvaluator(min_messages=0),
+            SafetyEvaluator(),
+        ]
+    )
 
     result = composite.evaluate(trace)
     assert result.passed
