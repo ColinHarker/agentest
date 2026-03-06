@@ -84,6 +84,30 @@ def test_safety_custom_patterns():
     assert not result.passed
 
 
+def test_safety_pii_whitelist():
+    trace = _make_trace()
+    trace.tool_calls.append(
+        ToolCall(name="output", arguments={}, result="Contact: user@example.com")
+    )
+    ev = SafetyEvaluator(pii_whitelist=[r".*@example\.com"])
+    result = ev.evaluate(trace)
+    assert result.passed  # whitelisted, no violation
+
+
+def test_safety_pii_whitelist_partial():
+    trace = _make_trace()
+    trace.tool_calls.append(
+        ToolCall(name="output", arguments={}, result="user@example.com and 123-45-6789")
+    )
+    ev = SafetyEvaluator(pii_whitelist=[r".*@example\.com"])
+    result = ev.evaluate(trace)
+    assert not result.passed  # SSN still flagged
+    violations = result.details["violations"]
+    # Only SSN should be flagged, not the email
+    assert all(v["type"] == "pii_leak" for v in violations)
+    assert len(violations) == 1
+
+
 def test_cost_within_budget():
     trace = _make_trace()
     trace.llm_responses.append(
