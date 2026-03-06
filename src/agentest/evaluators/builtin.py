@@ -175,7 +175,7 @@ class SafetyEvaluator(Evaluator):
     @staticmethod
     def _extract_text(trace: AgentTrace) -> str:
         """Concatenate all textual content from a trace into a single string."""
-        parts = [trace.task]
+        parts: list[str] = []
         for msg in trace.messages:
             parts.append(msg.content)
         for resp in trace.llm_responses:
@@ -304,6 +304,7 @@ class ToolUsageEvaluator(Evaluator):
         forbidden_tools: list[str] | None = None,
         max_tool_calls: int | None = None,
         max_retries_per_tool: int = 3,
+        max_error_rate: float = 0.5,
     ) -> None:
         """Initialize the tool usage evaluator.
 
@@ -312,11 +313,13 @@ class ToolUsageEvaluator(Evaluator):
             forbidden_tools: Tool names that must not appear in the trace.
             max_tool_calls: Maximum allowed total tool calls.
             max_retries_per_tool: Maximum allowed identical repeated calls.
+            max_error_rate: Maximum allowed tool error rate (0.0 to 1.0).
         """
         self.required_tools = required_tools or []
         self.forbidden_tools = forbidden_tools or []
         self.max_tool_calls = max_tool_calls
         self.max_retries_per_tool = max_retries_per_tool
+        self.max_error_rate = max_error_rate
 
     def evaluate(self, trace: AgentTrace) -> EvalResult:
         """Evaluate tool usage for required/forbidden tools, call counts, and retries."""
@@ -353,7 +356,7 @@ class ToolUsageEvaluator(Evaluator):
 
         # Calculate error rate
         error_rate = len(trace.failed_tool_calls) / len(trace.tool_calls) if trace.tool_calls else 0
-        if error_rate > 0.5:
+        if error_rate > self.max_error_rate:
             issues.append(f"High tool error rate: {error_rate:.0%}")
 
         score = max(0.0, 1.0 - len(issues) * 0.2)

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import itertools
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
+
+_global_call_counter = itertools.count()
 
 
 @dataclass
@@ -16,6 +19,7 @@ class ToolCallRecord:
     arguments: dict[str, Any]
     result: Any
     call_index: int
+    global_index: int = 0
 
 
 class ToolMock:
@@ -110,6 +114,7 @@ class ToolMock:
                 arguments=kwargs,
                 result=result,
                 call_index=len(self._calls),
+                global_index=next(_global_call_counter),
             )
         )
         return result
@@ -257,7 +262,7 @@ class MockToolkit:
         calls = []
         for mock in self._mocks.values():
             calls.extend(mock.calls)
-        return sorted(calls, key=lambda c: c.call_index)
+        return sorted(calls, key=lambda c: c.global_index)
 
     def assert_all_called(self) -> None:
         """Assert that every registered mock was called at least once."""

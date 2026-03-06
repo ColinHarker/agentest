@@ -70,6 +70,23 @@ def set_model_pricing(model: str, input_price_per_1m: float, output_price_per_1m
     _custom_pricing[model] = (input_price_per_1m, output_price_per_1m)
 
 
+def unset_model_pricing(model: str) -> None:
+    """Remove custom pricing for a model.
+
+    Args:
+        model: Model name to remove from custom pricing.
+
+    Raises:
+        KeyError: If the model has no custom pricing set.
+    """
+    del _custom_pricing[model]
+
+
+def reset_model_pricing() -> None:
+    """Remove all custom pricing overrides, reverting to defaults."""
+    _custom_pricing.clear()
+
+
 def get_model_pricing() -> dict[str, tuple[float, float]]:
     """Get the full pricing table (defaults + custom overrides)."""
     return {**DEFAULT_MODEL_PRICING, **_custom_pricing}
@@ -98,7 +115,9 @@ class LLMResponse(BaseModel):
         then falls back to built-in defaults. Returns 0.0 for unknown models.
         """
         pricing = get_model_pricing()
-        for model_prefix, (input_price, output_price) in pricing.items():
+        for model_prefix, (input_price, output_price) in sorted(
+            pricing.items(), key=lambda x: len(x[0]), reverse=True
+        ):
             if model_prefix in self.model:
                 return (
                     self.input_tokens * input_price / 1_000_000

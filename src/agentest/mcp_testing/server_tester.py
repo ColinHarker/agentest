@@ -8,6 +8,8 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+import agentest
+
 
 @dataclass
 class MCPTestResult:
@@ -120,7 +122,7 @@ class MCPServerTester:
             {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {},
-                "clientInfo": {"name": "agentest", "version": "0.1.0"},
+                "clientInfo": {"name": "agentest", "version": agentest.__version__},
             },
         )
 
@@ -141,6 +143,10 @@ class MCPServerTester:
         result = response.get("result", {})
         has_version = "protocolVersion" in result
         has_capabilities = "capabilities" in result
+
+        if has_version and has_capabilities:
+            # Send initialized notification as required by MCP protocol
+            self._send_request({"jsonrpc": "2.0", "method": "notifications/initialized"})
 
         return MCPTestResult(
             test_name="initialize",
