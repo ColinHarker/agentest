@@ -273,6 +273,7 @@ def create_app(traces_dir: str = "traces") -> FastAPI:
         trace = recorder.finalize(
             success=req.success if req.success is not None else True,
             error=req.error,
+            _silent=True,
         )
 
         filename = f"trace_{trace.id[:8]}.yaml"

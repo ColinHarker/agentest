@@ -177,26 +177,143 @@ def summary(trace_dir: str, fmt: str) -> None:
         )
 
 
-@main.command()
-def init() -> None:
-    """Initialize Agentest in the current project."""
-    # Create directories
-    dirs = ["traces", "tests/agent_tests"]
-    for d in dirs:
-        Path(d).mkdir(parents=True, exist_ok=True)
-        console.print(f"  Created {d}/")
+def _detect_framework() -> str:
+    """Detect which AI framework is installed."""
+    for pkg, name in [
+        ("langchain_core", "langchain"),
+        ("crewai", "crewai"),
+        ("anthropic", "anthropic"),
+        ("openai", "openai"),
+    ]:
+        try:
+            __import__(pkg)
+            return name
+        except ImportError:
+            continue
+    return "generic"
 
-    # Create sample test file
-    sample_test = Path("tests/agent_tests/test_agent_example.py")
-    if not sample_test.exists():
-        sample_test.write_text('''"""Example agent evaluation tests."""
 
-from agentest import Recorder, Replayer, ToolMock, MockToolkit
-from agentest.evaluators.builtin import (
-    TaskCompletionEvaluator,
-    SafetyEvaluator,
-    CostEvaluator,
-)
+_SAMPLE_TEST_ANTHROPIC = '''"""Example agent evaluation tests (Anthropic)."""
+
+import agentest
+from agentest import Recorder, SafetyEvaluator, CostEvaluator
+
+
+def test_agent_completes_task():
+    """Test that an agent completes its task successfully."""
+    recorder = Recorder(task="Summarize a document")
+    recorder.record_message("user", "Please summarize README.md")
+    recorder.record_tool_call(
+        name="read_file",
+        arguments={"path": "README.md"},
+        result="# My Project\\nThis is a sample project.",
+    )
+    recorder.record_llm_response(
+        model="claude-sonnet-4-6",
+        content="This project is a sample project.",
+        input_tokens=100,
+        output_tokens=20,
+    )
+    trace = recorder.finalize(success=True)
+
+    results = agentest.evaluate(trace)
+    assert all(r.passed for r in results)
+
+
+def test_safety_check():
+    """Test that unsafe commands are flagged."""
+    recorder = Recorder(task="Run a command")
+    recorder.record_tool_call(
+        name="bash",
+        arguments={"command": "rm -rf /"},
+        result="",
+    )
+    trace = recorder.finalize(success=True)
+
+    result = SafetyEvaluator().evaluate(trace)
+    assert not result.passed, "Should flag unsafe commands"
+
+
+def test_cost_budget():
+    """Test that cost limits are enforced."""
+    recorder = Recorder(task="Expensive task")
+    recorder.record_llm_response(
+        model="claude-opus-4-6",
+        content="response",
+        input_tokens=100000,
+        output_tokens=50000,
+    )
+    trace = recorder.finalize(success=True)
+
+    result = CostEvaluator(max_cost=0.50).evaluate(trace)
+    assert not result.passed, "Should flag over-budget tasks"
+'''
+
+_SAMPLE_TEST_LANGCHAIN = '''"""Example agent evaluation tests (LangChain)."""
+
+import agentest
+from agentest import Recorder, SafetyEvaluator, CostEvaluator
+
+
+# Use AgentestCallbackHandler with your LangChain chains:
+#
+#   from agentest.integrations.langchain import AgentestCallbackHandler
+#
+#   handler = AgentestCallbackHandler(task="My task")
+#   result = chain.invoke(input, config={"callbacks": [handler]})
+#   trace = handler.get_trace()
+#   results = agentest.evaluate(trace)
+
+
+def test_agent_completes_task():
+    """Test that an agent completes its task successfully."""
+    recorder = Recorder(task="Summarize a document")
+    recorder.record_message("user", "Please summarize README.md")
+    recorder.record_llm_response(
+        model="claude-sonnet-4-6",
+        content="This project is a sample project.",
+        input_tokens=100,
+        output_tokens=20,
+    )
+    trace = recorder.finalize(success=True)
+
+    results = agentest.evaluate(trace)
+    assert all(r.passed for r in results)
+
+
+def test_safety_check():
+    """Test that unsafe commands are flagged."""
+    recorder = Recorder(task="Run a command")
+    recorder.record_tool_call(
+        name="bash",
+        arguments={"command": "rm -rf /"},
+        result="",
+    )
+    trace = recorder.finalize(success=True)
+
+    result = SafetyEvaluator().evaluate(trace)
+    assert not result.passed, "Should flag unsafe commands"
+
+
+def test_cost_budget():
+    """Test that cost limits are enforced."""
+    recorder = Recorder(task="Expensive task")
+    recorder.record_llm_response(
+        model="claude-opus-4-6",
+        content="response",
+        input_tokens=100000,
+        output_tokens=50000,
+    )
+    trace = recorder.finalize(success=True)
+
+    result = CostEvaluator(max_cost=0.50).evaluate(trace)
+    assert not result.passed, "Should flag over-budget tasks"
+'''
+
+_SAMPLE_TEST_GENERIC = '''"""Example agent evaluation tests."""
+
+import agentest
+from agentest import Recorder, SafetyEvaluator, CostEvaluator
 
 
 def test_agent_completes_task(agent_recorder, agent_eval_suite):
@@ -241,8 +358,7 @@ def test_safety_check():
     )
     trace = recorder.finalize(success=True)
 
-    evaluator = SafetyEvaluator()
-    result = evaluator.evaluate(trace)
+    result = SafetyEvaluator().evaluate(trace)
     assert not result.passed, "Should flag unsafe commands"
 
 
@@ -257,11 +373,35 @@ def test_cost_budget():
     )
     trace = recorder.finalize(success=True)
 
-    evaluator = CostEvaluator(max_cost=0.50)
-    result = evaluator.evaluate(trace)
+    result = CostEvaluator(max_cost=0.50).evaluate(trace)
     assert not result.passed, "Should flag over-budget tasks"
-''')
+'''
+
+
+@main.command()
+def init() -> None:
+    """Initialize Agentest in the current project."""
+    # Create directories
+    dirs = ["traces", "tests/agent_tests"]
+    for d in dirs:
+        Path(d).mkdir(parents=True, exist_ok=True)
+        console.print(f"  Created {d}/")
+
+    # Detect framework and generate tailored sample test
+    framework = _detect_framework()
+    if framework in ("anthropic", "openai"):
+        sample_content = _SAMPLE_TEST_ANTHROPIC
+    elif framework == "langchain":
+        sample_content = _SAMPLE_TEST_LANGCHAIN
+    else:
+        sample_content = _SAMPLE_TEST_GENERIC
+
+    sample_test = Path("tests/agent_tests/test_agent_example.py")
+    if not sample_test.exists():
+        sample_test.write_text(sample_content)
         console.print(f"  Created {sample_test}")
+        if framework != "generic":
+            console.print(f"  Detected [cyan]{framework}[/cyan] — generated tailored examples")
 
     # Create sample conftest
     conftest = Path("tests/agent_tests/conftest.py")
@@ -278,6 +418,73 @@ The agentest pytest plugin auto-registers fixtures:
 
     console.print("\n[bold green]Agentest initialized![/bold green]")
     console.print("Run tests with: [cyan]pytest tests/agent_tests/[/cyan]")
+
+
+@main.command()
+def doctor() -> None:
+    """Check Agentest setup and report issues."""
+    import importlib
+
+    import agentest
+
+    console.print(f"[bold]agentest {agentest.__version__}[/bold]\n")
+
+    # Check for AI SDKs
+    for pkg, desc in [("anthropic", "Anthropic SDK"), ("openai", "OpenAI SDK")]:
+        try:
+            mod = importlib.import_module(pkg)
+            ver = getattr(mod, "__version__", "?")
+            msg = f"  [green]\u2713[/green] {desc} {ver}"
+            console.print(f"{msg} \u2014 auto-instrumentation available")
+        except ImportError:
+            console.print(f"  [dim]\u2013[/dim] {desc} not installed")
+
+    # Check for optional extras
+    for pkg, extra in [
+        ("opentelemetry", "otel"),
+        ("flask", "flask"),
+        ("fastapi", "web"),
+    ]:
+        try:
+            importlib.import_module(pkg)
+            console.print(f"  [green]\u2713[/green] {pkg} available")
+        except ImportError:
+            console.print(
+                f"  [dim]\u2013[/dim] {pkg} not installed"
+                f" (pip install agentest[{extra}])"
+            )
+
+    # Check traces directory
+    traces_dir = Path("traces")
+    if traces_dir.is_dir():
+        count = len(list(traces_dir.glob("*.yaml")) + list(traces_dir.glob("*.json")))
+        console.print(
+            f"\n  [green]\u2713[/green] traces/ directory ({count} trace files)"
+        )
+    else:
+        console.print(
+            "\n  [yellow]![/yellow] No traces/ directory"
+            " \u2014 run [cyan]agentest init[/cyan]"
+        )
+
+    # Check pytest plugin
+    try:
+        import agentest.pytest_plugin  # noqa: F401
+
+        console.print("  [green]\u2713[/green] pytest plugin registered")
+    except Exception:
+        console.print("  [yellow]![/yellow] pytest plugin not available")
+
+    # Check snapshots
+    snap_dir = Path(".agentest/snapshots")
+    if snap_dir.is_dir():
+        count = len(list(snap_dir.glob("*.yaml")))
+        console.print(f"  [green]\u2713[/green] Snapshots ({count} saved)")
+    else:
+        console.print(
+            "  [dim]\u2013[/dim] No snapshots"
+            " \u2014 run [cyan]agentest snapshot save[/cyan] after a good run"
+        )
 
 
 @main.command()

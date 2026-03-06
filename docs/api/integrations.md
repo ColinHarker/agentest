@@ -15,6 +15,21 @@ title: Integrations
 - `clear_traces()` — Clear recorded traces
 - `flush_trace(task=None)` — Finalize current trace, optionally start new one
 - `get_current_recorder()` — Get the active Recorder
+- `set_exporter(exporter)` — Set a trace exporter for auto-instrumented traces
+- `clear_exporter()` — Remove the current trace exporter
+
+## OpenTelemetry Export
+
+`agentest.integrations.otel`
+
+Install: `pip install agentest[otel]`
+
+### `OTelExporter`
+
+- `OTelExporter(tracer_provider=None, service_name="agentest")` — Create an exporter
+- `export(agent_trace, eval_results=None)` — Export an AgentTrace as OTel spans
+
+See the [OpenTelemetry Export guide](/guide/otel) for span structure and attribute reference.
 
 ## Claude Agent SDK
 

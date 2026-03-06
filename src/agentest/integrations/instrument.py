@@ -33,6 +33,7 @@ _original_openai_create: Any = None
 _original_openai_create_async: Any = None
 _global_traces: list[AgentTrace] = []
 _lock = threading.Lock()
+_exporter: Any | None = None
 
 
 def _get_recorder(task: str = "auto-instrumented") -> Recorder:
@@ -46,11 +47,42 @@ def _get_recorder(task: str = "auto-instrumented") -> Recorder:
 def _finalize_and_store(success: bool = True, error: str | None = None) -> AgentTrace:
     """Finalize current recorder and store the trace."""
     recorder = _get_recorder()
-    trace = recorder.finalize(success=success, error=error)
+    trace = recorder.finalize(success=success, error=error, _silent=True)
     with _lock:
         _global_traces.append(trace)
+    if _exporter is not None:
+        _exporter.export(trace)
     _local.recorder = None
     return trace
+
+
+def set_exporter(exporter: Any) -> None:
+    """Set a trace exporter for auto-instrumented traces.
+
+    When set, every finalized trace is automatically exported.
+    Typically used with ``OTelExporter`` for OpenTelemetry integration.
+
+    Args:
+        exporter: An object with an ``export(trace)`` method (e.g., OTelExporter).
+
+    Example:
+        >>> from agentest.integrations.otel import OTelExporter
+        >>> agentest.instrument()
+        >>> agentest.set_exporter(OTelExporter())
+    """
+    global _exporter
+    _exporter = exporter
+
+
+def clear_exporter() -> None:
+    """Remove the current trace exporter."""
+    global _exporter
+    _exporter = None
+
+
+def is_instrumented() -> bool:
+    """Return whether auto-instrumentation is currently active."""
+    return _instrumented
 
 
 def get_current_recorder() -> Recorder:

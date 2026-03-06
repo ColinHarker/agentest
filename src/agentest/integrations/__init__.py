@@ -4,6 +4,7 @@ Auto-instrumentation and adapters for popular AI/agent frameworks:
 - instrument(): Zero-code monkey-patching for anthropic/openai clients
 - instrument_fastapi(): ASGI middleware for FastAPI/Starlette endpoints
 - instrument_flask(): WSGI middleware for Flask endpoints
+- OTelExporter: Export AgentTrace as OpenTelemetry spans (pip install agentest[otel])
 - LangChainAdapter: LangChain callback handler -> AgentTrace
 - CrewAIAdapter: CrewAI crew execution -> AgentTrace
 - AutoGenAdapter: AutoGen conversation -> AgentTrace
@@ -12,7 +13,12 @@ Auto-instrumentation and adapters for popular AI/agent frameworks:
 - OpenAIAgentsAdapter: OpenAI Agents SDK -> AgentTrace
 """
 
-from agentest.integrations.instrument import instrument, uninstrument
+from agentest.integrations.instrument import (
+    clear_exporter,
+    instrument,
+    set_exporter,
+    uninstrument,
+)
 from agentest.integrations.middleware import (
     AgentestMiddleware,
     FlaskAgentestMiddleware,
@@ -23,6 +29,8 @@ from agentest.integrations.middleware import (
 __all__ = [
     "instrument",
     "uninstrument",
+    "set_exporter",
+    "clear_exporter",
     "AgentestMiddleware",
     "FlaskAgentestMiddleware",
     "instrument_fastapi",
