@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 
 _global_call_counter = itertools.count()
+_SENTINEL = object()  # Sentinel for unset default_after_exhaustion
 
 
 @dataclass
@@ -59,6 +60,8 @@ class ToolMock:
         self._conditions: list[tuple[dict[str, Any], Any, type[Exception] | Exception | None]] = []
         self._sequence: list[Any] = []
         self._sequence_index = 0
+        self._sequence_loop = False
+        self._sequence_default: Any = _SENTINEL
         self._custom_handler: Callable[[dict[str, Any]], Any] | None = None
         self._calls: list[ToolCallRecord] = []
         self._building_condition: dict[str, Any] | None = None
@@ -84,9 +87,24 @@ class ToolMock:
         self._building_condition = None
         return self
 
-    def returns_sequence(self, values: list[Any]) -> ToolMock:
-        """Return values in sequence, one per call."""
+    def returns_sequence(
+        self,
+        values: list[Any],
+        *,
+        loop: bool = False,
+        default_after_exhaustion: Any = _SENTINEL,
+    ) -> ToolMock:
+        """Return values in sequence, one per call.
+
+        Args:
+            values: The sequence of return values.
+            loop: If True, cycle through values indefinitely.
+            default_after_exhaustion: Value to return after sequence is exhausted.
+                If not set and loop is False, raises IndexError on exhaustion.
+        """
         self._sequence = values
+        self._sequence_loop = loop
+        self._sequence_default = default_after_exhaustion
         return self
 
     def raises(self, error: type[Exception] | Exception) -> ToolMock:
@@ -131,9 +149,15 @@ class ToolMock:
         # Sequence mode
         if self._sequence:
             if self._sequence_index >= len(self._sequence):
-                raise IndexError(
-                    f"ToolMock {self.name!r}: exhausted sequence after {len(self._sequence)} calls"
-                )
+                if self._sequence_loop:
+                    self._sequence_index = 0
+                elif self._sequence_default is not _SENTINEL:
+                    return self._sequence_default
+                else:
+                    raise IndexError(
+                        f"ToolMock {self.name!r}: exhausted sequence "
+                        f"after {len(self._sequence)} calls"
+                    )
             result = self._sequence[self._sequence_index]
             self._sequence_index += 1
             return result
@@ -230,9 +254,15 @@ class MockToolkit:
         toolkit.assert_all_called()
     """
 
-    def __init__(self) -> None:
-        """Initialize an empty mock toolkit."""
+    def __init__(self, strict: bool = True) -> None:
+        """Initialize an empty mock toolkit.
+
+        Args:
+            strict: If True (default), raises KeyError for unregistered tools.
+                If False, auto-creates passthrough mocks for unregistered tools.
+        """
         self._mocks: dict[str, ToolMock] = {}
+        self._strict = strict
 
     def mock(self, name: str) -> ToolMock:
         """Get or create a mock for a tool."""
@@ -247,9 +277,11 @@ class MockToolkit:
     def execute(self, name: str, **kwargs: Any) -> Any:
         """Execute a mocked tool by name."""
         if name not in self._mocks:
-            raise KeyError(
-                f"No mock registered for tool {name!r}. Available: {list(self._mocks.keys())}"
-            )
+            if self._strict:
+                raise KeyError(
+                    f"No mock registered for tool {name!r}. Available: {list(self._mocks.keys())}"
+                )
+            self._mocks[name] = ToolMock(name)
         return self._mocks[name](**kwargs)
 
     def has_mock(self, name: str) -> bool:

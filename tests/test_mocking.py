@@ -141,3 +141,45 @@ def test_mock_toolkit_summary():
     summary = toolkit.summary()
     assert summary["read"] == 2
     assert summary["write"] == 1
+
+
+def test_sequence_loop():
+    """returns_sequence with loop=True should cycle through values."""
+    mock = ToolMock("counter").returns_sequence([1, 2, 3], loop=True)
+    assert mock() == 1
+    assert mock() == 2
+    assert mock() == 3
+    assert mock() == 1  # loops back
+    assert mock() == 2
+
+
+def test_sequence_default_after_exhaustion():
+    """returns_sequence with default_after_exhaustion should return default when exhausted."""
+    mock = ToolMock("loader").returns_sequence(["a", "b"], default_after_exhaustion="done")
+    assert mock() == "a"
+    assert mock() == "b"
+    assert mock() == "done"
+    assert mock() == "done"
+
+
+def test_sequence_exhaustion_raises_by_default():
+    """returns_sequence without loop or default should raise IndexError."""
+    mock = ToolMock("loader").returns_sequence(["only"])
+    assert mock() == "only"
+    with pytest.raises(IndexError):
+        mock()
+
+
+def test_mock_toolkit_non_strict():
+    """MockToolkit in non-strict mode should auto-create mocks."""
+    toolkit = MockToolkit(strict=False)
+    result = toolkit.execute("unknown_tool")
+    assert result is None  # default mock returns None
+    assert toolkit.has_mock("unknown_tool")
+
+
+def test_mock_toolkit_strict_by_default():
+    """MockToolkit should raise KeyError for unregistered tools by default."""
+    toolkit = MockToolkit()
+    with pytest.raises(KeyError):
+        toolkit.execute("unknown_tool")

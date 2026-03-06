@@ -19,7 +19,13 @@ from agentest.core import (
     unset_model_pricing,
 )
 from agentest.datasets import ABTestResult, Dataset, DatasetRunner, TestCase
-from agentest.evaluators.base import CompositeEvaluator, EvalResult, Evaluator, LLMJudgeEvaluator
+from agentest.evaluators.base import (
+    CompositeEvaluator,
+    EvalResult,
+    Evaluator,
+    LLMJudgeEvaluator,
+    RubricEvaluator,
+)
 from agentest.evaluators.builtin import (
     CostEvaluator,
     LatencyEvaluator,
@@ -47,6 +53,7 @@ from agentest.integrations.middleware import (
     instrument_flask,
 )
 from agentest.mcp_testing.assertions import MCPAssertions
+from agentest.mcp_testing.security import MCPSecurityTester, SecurityTestResult
 from agentest.mcp_testing.server_tester import MCPServerTester, MCPTestResult
 from agentest.mocking.tool_mock import MockToolkit, ToolMock
 from agentest.recorder.recorder import Recorder
@@ -58,6 +65,7 @@ from agentest.regression import (
     RegressionResult,
     RegressionThresholds,
 )
+from agentest.snapshots import SnapshotConfig, SnapshotManager, SnapshotResult
 from agentest.stats import (
     SLO,
     ConfidenceInterval,
@@ -94,6 +102,7 @@ __all__ = [
     "EvalResult",
     "CompositeEvaluator",
     "LLMJudgeEvaluator",
+    "RubricEvaluator",
     "TaskCompletionEvaluator",
     "SafetyEvaluator",
     "CostEvaluator",
@@ -113,6 +122,12 @@ __all__ = [
     "MCPServerTester",
     "MCPTestResult",
     "MCPAssertions",
+    "MCPSecurityTester",
+    "SecurityTestResult",
+    # Snapshots
+    "SnapshotManager",
+    "SnapshotConfig",
+    "SnapshotResult",
     # Auto-instrumentation
     "instrument",
     "uninstrument",

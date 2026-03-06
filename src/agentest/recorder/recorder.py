@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 import time
 from pathlib import Path
@@ -31,6 +32,7 @@ class Recorder:
     def __init__(self, task: str = "", metadata: dict[str, Any] | None = None) -> None:
         self.trace = AgentTrace(task=task, metadata=metadata or {})
         self._active = True
+        self._pending_tool_calls: dict[str, int] = {}  # tool_use_id -> index in tool_calls
 
     def record_message(self, role: str | Role, content: str) -> Message:
         """Record a conversation message."""
@@ -93,6 +95,14 @@ class Recorder:
             else:
                 self.finalize(success=True)
 
+    async def __aenter__(self) -> Recorder:
+        """Start recording as an async context manager."""
+        return self
+
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Finalize recording on async context exit."""
+        self.__exit__(exc_type, exc_val, exc_tb)
+
     def wrap_tool(self, name: str, func: Any) -> Any:
         """Wrap a tool function to automatically record its calls.
 
@@ -106,21 +116,36 @@ class Recorder:
 
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             start = time.time()
+            # Normalize positional args to named kwargs for recording
+            try:
+                sig = inspect.signature(func)
+                bound = sig.bind(*args, **kwargs)
+                bound.apply_defaults()
+                recorded_args = dict(bound.arguments)
+            except (ValueError, TypeError):
+                recorded_args = {**{f"arg{i}": v for i, v in enumerate(args)}, **kwargs}
             try:
                 result = func(*args, **kwargs)
                 duration = (time.time() - start) * 1000
                 self.record_tool_call(
-                    name=name, arguments=kwargs, result=result, duration_ms=duration
+                    name=name, arguments=recorded_args, result=result, duration_ms=duration
                 )
                 return result
             except Exception as e:
                 duration = (time.time() - start) * 1000
                 self.record_tool_call(
-                    name=name, arguments=kwargs, error=str(e), duration_ms=duration
+                    name=name, arguments=recorded_args, error=str(e), duration_ms=duration
                 )
                 raise
 
         return wrapper
+
+    def record_tool_result(self, tool_use_id: str, result: Any) -> None:
+        """Backfill the result for a previously recorded tool call by its tool_use_id."""
+        if tool_use_id in self._pending_tool_calls:
+            idx = self._pending_tool_calls.pop(tool_use_id)
+            if 0 <= idx < len(self.trace.tool_calls):
+                self.trace.tool_calls[idx].result = result
 
     def finalize(self, success: bool = True, error: str | None = None) -> AgentTrace:
         """Finalize the recording and return the trace."""

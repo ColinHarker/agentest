@@ -65,6 +65,17 @@ class BenchmarkResult:
             "total_time_ms": f"{self.total_time_ms:.0f}",
         }
 
+    def to_session(self) -> Any:
+        """Convert benchmark results into a TraceSession."""
+        from agentest.core import TraceSession
+
+        traces = [r.trace for r in self.tasks if r.trace is not None]
+        return TraceSession(
+            name=self.name,
+            traces=traces,
+            metadata={"total_time_ms": self.total_time_ms, **self.metadata},
+        )
+
 
 @dataclass
 class TaskResult:

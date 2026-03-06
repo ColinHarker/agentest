@@ -195,3 +195,88 @@ def test_composite_evaluator():
     results = composite.evaluate_all(trace)
     assert len(results) == 2
     assert all(r.passed for r in results)
+
+
+def test_llm_judge_parse_json_response():
+    """LLMJudgeEvaluator should parse JSON responses."""
+    from agentest.evaluators.base import LLMJudgeEvaluator
+
+    score, reasoning = LLMJudgeEvaluator._parse_response(
+        '{"score": 0.85, "reasoning": "Good performance"}'
+    )
+    assert abs(score - 0.85) < 0.01
+    assert reasoning == "Good performance"
+
+
+def test_llm_judge_parse_json_with_code_fence():
+    """LLMJudgeEvaluator should handle JSON wrapped in code fences."""
+    from agentest.evaluators.base import LLMJudgeEvaluator
+
+    score, reasoning = LLMJudgeEvaluator._parse_response(
+        '```json\n{"score": 0.9, "reasoning": "Excellent"}\n```'
+    )
+    assert abs(score - 0.9) < 0.01
+    assert reasoning == "Excellent"
+
+
+def test_llm_judge_parse_legacy_format():
+    """LLMJudgeEvaluator should still parse legacy SCORE/REASONING format."""
+    from agentest.evaluators.base import LLMJudgeEvaluator
+
+    score, reasoning = LLMJudgeEvaluator._parse_response("SCORE: 0.75\nREASONING: Decent work")
+    assert abs(score - 0.75) < 0.01
+    assert reasoning == "Decent work"
+
+
+def test_llm_judge_parse_invalid_defaults():
+    """LLMJudgeEvaluator should default to 0.5 for unparseable responses."""
+    from agentest.evaluators.base import LLMJudgeEvaluator
+
+    score, _ = LLMJudgeEvaluator._parse_response("This is just freeform text with no structure.")
+    assert abs(score - 0.5) < 0.01
+
+
+def test_rubric_evaluator_no_client():
+    """RubricEvaluator without client should return score 0.0."""
+    from agentest.evaluators.base import RubricEvaluator
+
+    evaluator = RubricEvaluator(rubric={"accuracy": 1.0, "clarity": 0.5})
+    trace = AgentTrace(task="test")
+    trace.finalize(success=True)
+
+    result = evaluator.evaluate(trace)
+    assert result.score == 0.0
+    assert not result.passed
+
+
+def test_rubric_evaluator_weight_normalization():
+    """RubricEvaluator should normalize weights."""
+    from agentest.evaluators.base import RubricEvaluator
+
+    evaluator = RubricEvaluator(rubric={"a": 2.0, "b": 8.0})
+    assert abs(evaluator.rubric["a"] - 0.2) < 0.01
+    assert abs(evaluator.rubric["b"] - 0.8) < 0.01
+
+
+def test_benchmark_result_to_session():
+    """BenchmarkResult.to_session() should produce a TraceSession."""
+    from agentest.benchmark.runner import BenchmarkResult, TaskResult
+
+    trace1 = AgentTrace(task="t1")
+    trace1.finalize(success=True)
+    trace2 = AgentTrace(task="t2")
+    trace2.finalize(success=True)
+
+    result = BenchmarkResult(
+        name="bench",
+        tasks=[
+            TaskResult(task_name="t1", trace=trace1, eval_results=[], duration_ms=100),
+            TaskResult(task_name="t2", trace=trace2, eval_results=[], duration_ms=200),
+        ],
+        total_time_ms=300,
+    )
+
+    session = result.to_session()
+    assert session.name == "bench"
+    assert session.total_traces == 2
+    assert session.metadata["total_time_ms"] == 300

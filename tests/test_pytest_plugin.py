@@ -74,7 +74,7 @@ def test_pytest_configure_registers_markers():
     config = FakeConfig()
     pytest_configure(config)
     marker_lines = [v for k, v in config._ini_values if k == "markers"]
-    assert len(marker_lines) == 4
+    assert len(marker_lines) == 5
     assert any("agent_eval" in m for m in marker_lines)
     assert any("agent_safety" in m for m in marker_lines)
     assert any("agent_benchmark" in m for m in marker_lines)

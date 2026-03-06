@@ -40,6 +40,47 @@ def test_llm_response_unknown_model():
     assert resp.cost_estimate == 0.0
 
 
+def test_cost_estimate_exact_match_over_prefix():
+    """Exact model name should match before prefix fallback."""
+    from agentest.core import reset_model_pricing, set_model_pricing
+
+    set_model_pricing("gpt-4o", 5.0, 15.0)
+    set_model_pricing("gpt-4o-mini", 0.15, 0.6)
+
+    resp_mini = LLMResponse(model="gpt-4o-mini", input_tokens=1_000_000, output_tokens=0)
+    resp_full = LLMResponse(model="gpt-4o", input_tokens=1_000_000, output_tokens=0)
+
+    # gpt-4o-mini should use mini pricing, not gpt-4o pricing
+    assert abs(resp_mini.cost_estimate - 0.15) < 0.01
+    assert abs(resp_full.cost_estimate - 5.0) < 0.01
+    reset_model_pricing()
+
+
+def test_cost_estimate_uses_startswith_not_contains():
+    """Model matching should use startswith, not substring contains."""
+    resp = LLMResponse(model="my-custom-gpt-4o", input_tokens=1000, output_tokens=500)
+    # "gpt-4o" should NOT match "my-custom-gpt-4o" via substring
+    assert resp.cost_estimate == 0.0
+
+
+def test_diff_traces_duplicate_tool_calls():
+    """diff_traces should detect frequency differences in tool calls."""
+    trace_a = AgentTrace(task="test")
+    trace_a.tool_calls.append(ToolCall(name="read_file", result="ok"))
+    trace_a.finalize(success=True)
+
+    trace_b = AgentTrace(task="test")
+    trace_b.tool_calls.append(ToolCall(name="read_file", result="ok"))
+    trace_b.tool_calls.append(ToolCall(name="read_file", result="ok2"))
+    trace_b.tool_calls.append(ToolCall(name="read_file", result="ok3"))
+    trace_b.finalize(success=True)
+
+    result = diff_traces(trace_a, trace_b)
+    # trace_b has 2 extra read_file calls
+    assert result["tool_calls"]["added"].count("read_file") == 2
+    assert result["tool_calls"]["removed"] == []
+
+
 def test_agent_trace_properties():
     trace = AgentTrace(task="test task")
     trace.llm_responses.append(
