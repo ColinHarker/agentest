@@ -127,6 +127,14 @@ class LLMJudgeEvaluator(Evaluator):
         self.criteria = criteria
         self.model = model
         self.client = client
+        if client is None:
+            import warnings
+
+            warnings.warn(
+                "LLMJudgeEvaluator created without a client — evaluate() will return "
+                "score=0.0. Pass client=anthropic.Anthropic() or client=openai.OpenAI().",
+                stacklevel=2,
+            )
 
     def evaluate(self, trace: AgentTrace) -> EvalResult:
         if self.client is None:

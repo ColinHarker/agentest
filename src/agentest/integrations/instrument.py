@@ -47,7 +47,7 @@ def _get_recorder(task: str = "auto-instrumented") -> Recorder:
 def _finalize_and_store(success: bool = True, error: str | None = None) -> AgentTrace:
     """Finalize current recorder and store the trace."""
     recorder = _get_recorder()
-    trace = recorder.finalize(success=success, error=error)
+    trace = recorder.finalize(success=success, error=error, _silent=True)
     with _lock:
         _global_traces.append(trace)
     if _exporter is not None:
@@ -78,6 +78,11 @@ def clear_exporter() -> None:
     """Remove the current trace exporter."""
     global _exporter
     _exporter = None
+
+
+def is_instrumented() -> bool:
+    """Return whether auto-instrumentation is currently active."""
+    return _instrumented
 
 
 def get_current_recorder() -> Recorder:

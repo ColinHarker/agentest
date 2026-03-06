@@ -147,8 +147,63 @@ class Recorder:
             if 0 <= idx < len(self.trace.tool_calls):
                 self.trace.tool_calls[idx].result = result
 
-    def finalize(self, success: bool = True, error: str | None = None) -> AgentTrace:
-        """Finalize the recording and return the trace."""
+    @classmethod
+    def from_messages(
+        cls,
+        messages: list[dict[str, Any]],
+        task: str = "",
+        model: str = "",
+        success: bool = True,
+        metadata: dict[str, Any] | None = None,
+    ) -> AgentTrace:
+        """Create a finalized trace from a list of message dicts.
+
+        Each dict should have ``role`` and ``content`` keys (OpenAI format).
+        If ``model`` is provided, assistant messages also generate LLM responses.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content' keys.
+            task: Task description for the trace.
+            model: Model name to record for assistant messages.
+            success: Whether the trace succeeded.
+            metadata: Optional metadata dict.
+
+        Returns:
+            A finalized AgentTrace.
+        """
+        recorder = cls(task=task, metadata=metadata)
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            recorder.record_message(role, content)
+            if role == "assistant" and model:
+                recorder.record_llm_response(
+                    model=model, content=content, input_tokens=0, output_tokens=0
+                )
+        return recorder.finalize(success=success)
+
+    def finalize(
+        self, success: bool = True, error: str | None = None, _silent: bool = False
+    ) -> AgentTrace:
+        """Finalize the recording and return the trace.
+
+        Args:
+            success: Whether the agent task succeeded.
+            error: Optional error message if the task failed.
+        """
+        if (
+            not _silent
+            and not self.trace.llm_responses
+            and not self.trace.tool_calls
+            and not self.trace.messages
+        ):
+            import warnings
+
+            warnings.warn(
+                "Finalizing a Recorder with no recorded data. "
+                "Did you forget to call record_llm_response() or use agentest.instrument()?",
+                stacklevel=2,
+            )
         self.trace.finalize(success=success, error=error)
         self._active = False
         return self.trace

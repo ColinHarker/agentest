@@ -102,13 +102,25 @@ def pytest_configure(config: Any) -> None:
     config.addinivalue_line("markers", "agent_benchmark: mark test as an agent benchmark test")
     config.addinivalue_line("markers", "agent_regression: mark test as a regression detection test")
     config.addinivalue_line("markers", "agent_snapshot: mark test as a trace snapshot test")
+    config.addinivalue_line("markers", "agent_task(name): set task name for agent_recorder fixture")
 
 
 @pytest.fixture
-def agent_recorder() -> Generator[Recorder, None, None]:
-    """Fixture that provides a fresh Recorder for each test."""
-    recorder = Recorder(task="test")
+def agent_recorder(request: Any) -> Generator[Recorder, None, None]:
+    """Fixture that provides a fresh Recorder for each test.
+
+    Use ``@pytest.mark.agent_task("My task")`` to set the task name.
+    The recorder is auto-finalized on test exit if not already finalized.
+    """
+    task = "test"
+    marker = request.node.get_closest_marker("agent_task")
+    if marker and marker.args:
+        task = marker.args[0]
+    recorder = Recorder(task=task)
     yield recorder
+    # Auto-finalize if still active
+    if recorder._active:
+        recorder.finalize(success=True, _silent=True)
 
 
 @pytest.fixture
