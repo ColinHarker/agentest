@@ -29,7 +29,7 @@ const config = {
         docs: {
           sidebarPath: "./sidebars.js",
           editUrl: "https://github.com/ColinHarker/agentest/tree/main/",
-          routeBasePath: "docs",
+          routeBasePath: "/",
         },
         blog: false,
         theme: {
@@ -64,9 +64,9 @@ const config = {
           {
             title: "Docs",
             items: [
-              { label: "Getting Started", to: "/docs/getting-started/installation" },
-              { label: "User Guide", to: "/docs/guide/recording" },
-              { label: "API Reference", to: "/docs/api/core" },
+              { label: "Getting Started", to: "/getting-started/installation" },
+              { label: "User Guide", to: "/guide/recording" },
+              { label: "API Reference", to: "/api/core" },
             ],
           },
           {
