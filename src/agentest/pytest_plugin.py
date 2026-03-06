@@ -120,7 +120,8 @@ def agent_recorder(request: Any) -> Generator[Recorder, None, None]:
     yield recorder
     # Auto-finalize if still active
     if recorder._active:
-        recorder.finalize(success=True, _silent=True)
+        recorder._suppress_empty_warning = True
+        recorder.finalize(success=True)
 
 
 @pytest.fixture

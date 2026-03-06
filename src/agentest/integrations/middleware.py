@@ -112,7 +112,8 @@ class AgentestMiddleware:
             success = error_msg is None and status_code < 500
             recorder.trace.metadata["status_code"] = status_code
             recorder.trace.metadata["latency_ms"] = latency_ms
-            trace = recorder.finalize(success=success, error=error_msg, _silent=True)
+            recorder._suppress_empty_warning = True
+            trace = recorder.finalize(success=success, error=error_msg)
 
             if self.on_trace:
                 self.on_trace(trace)
@@ -195,7 +196,8 @@ class FlaskAgentestMiddleware:
             success = error_msg is None and status_code < 500
             recorder.trace.metadata["status_code"] = status_code
             recorder.trace.metadata["latency_ms"] = latency_ms
-            trace = recorder.finalize(success=success, error=error_msg, _silent=True)
+            recorder._suppress_empty_warning = True
+            trace = recorder.finalize(success=success, error=error_msg)
 
             if self.on_trace:
                 self.on_trace(trace)

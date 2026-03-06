@@ -9,7 +9,10 @@ from dataclasses import dataclass
 from typing import Any
 
 _global_call_counter = itertools.count()
-_SENTINEL = object()  # Sentinel for unset default_after_exhaustion
+# Internal sentinel to distinguish "no default provided" from None.
+# When default_after_exhaustion is _SENTINEL, IndexError is raised on sequence
+# exhaustion. This allows None to be a valid explicit default value.
+_SENTINEL = object()
 
 
 @dataclass

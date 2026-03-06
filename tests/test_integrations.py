@@ -11,11 +11,11 @@ import pytest
 from agentest.core import AgentTrace
 
 # Force-import the module first, then get the actual module object
+from agentest.integrations._anthropic_patch import _wrap_anthropic_create  # noqa: F401
+from agentest.integrations._openai_patch import _wrap_openai_create  # noqa: F401
 from agentest.integrations.instrument import (
     _finalize_and_store,  # noqa: F401
     _get_recorder,  # noqa: F401
-    _wrap_anthropic_create,  # noqa: F401
-    _wrap_openai_create,  # noqa: F401
     clear_traces,
     flush_trace,
     get_current_recorder,
@@ -439,42 +439,32 @@ class TestOpenAIAgentsAdapter:
 
 
 class TestGitHubAction:
-    def test_evaluate_script_empty_dir(self, tmp_path):
-        """Test the action evaluate script with no traces."""
-        import json
-        import os
+    """Tests for the GitHub Action evaluation.
+
+    The action/evaluate.py script was removed (consolidated into root action.yml).
+    These tests verify the equivalent functionality via the CLI evaluate command.
+    """
+
+    def test_evaluate_cli_empty_dir(self, tmp_path):
+        """Test CLI evaluate with no traces."""
+        from click.testing import CliRunner
+
+        from agentest.cli import main
 
         traces_dir = tmp_path / "traces"
         traces_dir.mkdir()
-        output_file = str(tmp_path / "report.json")
 
-        env = {
-            "TRACES_DIR": str(traces_dir),
-            "CHECK_SAFETY": "true",
-            "EVALUATORS": "task_completion,safety",
-            "OUTPUT_FILE": output_file,
-            "FAIL_ON_ERROR": "false",
-        }
+        runner = CliRunner()
+        # summary command on empty dir should report no traces
+        result = runner.invoke(main, ["summary", str(traces_dir)])
+        assert result.exit_code == 0
+        assert "No traces found" in result.output
 
-        # Add the action dir to sys.path so we can import
-        sys.path.insert(0, "/home/user/claude-fun")
+    def test_evaluate_cli_with_trace(self, tmp_path):
+        """Test CLI evaluate with a real trace."""
+        from click.testing import CliRunner
 
-        with patch.dict(os.environ, env, clear=False):
-            from action.evaluate import main
-
-            main()
-
-        # The empty dir case prints notice but doesn't write the file normally
-        # when no traces are found, it still writes the output
-        report_path = tmp_path / "report.json"
-        if report_path.exists():
-            report = json.loads(report_path.read_text())
-            assert report["total"] == 0
-
-    def test_evaluate_script_with_trace(self, tmp_path):
-        """Test the action evaluate script with a real trace."""
-        import json
-        import os
+        from agentest.cli import main
 
         traces_dir = tmp_path / "traces"
         traces_dir.mkdir()
@@ -487,22 +477,6 @@ class TestGitHubAction:
         recorder.finalize(success=True)
         recorder.save(traces_dir / "test.yaml")
 
-        output_file = str(tmp_path / "report.json")
-        env = {
-            "TRACES_DIR": str(traces_dir),
-            "CHECK_SAFETY": "true",
-            "EVALUATORS": "task_completion,safety,tool_usage",
-            "OUTPUT_FILE": output_file,
-            "FAIL_ON_ERROR": "false",
-        }
-
-        sys.path.insert(0, "/home/user/claude-fun")
-
-        with patch.dict(os.environ, env, clear=False):
-            from action.evaluate import main
-
-            main()
-
-        report = json.loads((tmp_path / "report.json").read_text())
-        assert report["total"] == 1
-        assert report["passed"] >= 0
+        runner = CliRunner()
+        result = runner.invoke(main, ["evaluate", str(traces_dir / "test.yaml")])
+        assert result.exit_code == 0

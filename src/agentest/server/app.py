@@ -270,10 +270,10 @@ def create_app(traces_dir: str = "traces") -> FastAPI:
                 duration_ms=tc.get("duration_ms"),
             )
 
+        recorder._suppress_empty_warning = True
         trace = recorder.finalize(
             success=req.success if req.success is not None else True,
             error=req.error,
-            _silent=True,
         )
 
         filename = f"trace_{trace.id[:8]}.yaml"

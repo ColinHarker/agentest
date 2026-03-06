@@ -4,6 +4,48 @@ All notable changes to Agentest will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.2] - 2026-03-06
+
+### Added
+
+- **Developer experience** — `agentest.run()` for quick one-shot agent recording, `@agentest.trace()` decorator for automatic tracing, `Recorder.from_messages()` for instant trace creation from message lists
+- **OpenTelemetry export** — `agentest.integrations.otel` module for exporting traces to any OTel-compatible backend
+- **Best practices guide** — `docs/guide/best-practices.md` with integration patterns and recommendations
+
+## [1.0.1] - 2026-03-06
+
+### Added
+
+- **MCP security testing** — `mcp_testing/security.py` for security-focused MCP server testing
+- **Snapshot CI** — `snapshot check-dir` command for CI-friendly batch snapshot verification
+
+### Fixed
+
+- Async instrumentation hardening for edge cases in `_anthropic_patch` and `_openai_patch`
+- Minor bug fixes in CLI error handling
+
+## [1.0.0] - 2026-03-06
+
+### Added
+
+- **Custom metrics** — `MetricEvaluator` and `metrics.py` module for defining numeric metrics with thresholds
+- **Streaming recorder** — `StreamingRecorder` for real-time trace event streaming
+- **Regression detection** — `RegressionDetector`, `RegressionEvaluator`, and `regression` CLI command for detecting performance regressions against baselines
+- **Statistical analysis** — `StatsAnalyzer` with trend detection, confidence intervals, and SLO tracking via `stats` CLI command
+- **Dataset management** — `Dataset`, `TestCase`, `DatasetRunner` with `dataset create/list/split` CLI commands
+- **Trace snapshots** — `SnapshotManager` with `snapshot save/check/check-dir` CLI commands
+- **ASGI/WSGI middleware** — `AgentestMiddleware` (FastAPI/Starlette) and `FlaskAgentestMiddleware` for auto-recording endpoint traces
+- **Rubric evaluator** — `RubricEvaluator` for multi-criteria LLM-based evaluation with weighted scoring
+- **New CLI commands** — `doctor`, `regression`, `stats`, `dataset`, `snapshot`
+
+### Changed
+
+- CLI restructured from single `cli.py` (1067 lines) into `cli/` subpackage with 15 modules
+- Evaluator count increased from 7 to 10 built-in evaluators
+- `instrument.py` split into `instrument.py` + `_anthropic_patch.py` + `_openai_patch.py`
+- `Recorder.finalize()` `_silent` parameter replaced with `_suppress_empty_warning` attribute
+- Shared LLM judge logic extracted to `evaluators/_llm_utils.py`
+
 ## [0.2.0] - 2026-03-05
 
 ### Added
@@ -25,7 +67,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 ### Changed
 
 - **FastAPI/uvicorn are now optional** — install with `pip install agentest[web]` for web UI support
-- Core package reduced from 8 to 6 runtime dependencies
+- Core package reduced from 8 to 4 runtime dependencies
 - CLI `serve` and `ui` commands now show helpful error message when web extras are missing
 - Added `[langchain]`, `[crewai]`, `[autogen]`, `[llamaindex]`, `[web]`, and `[all]` optional dependency groups
 

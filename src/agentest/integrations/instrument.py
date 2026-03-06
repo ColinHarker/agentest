@@ -14,9 +14,7 @@ Usage:
 
 from __future__ import annotations
 
-import functools
 import threading
-import time
 from typing import Any
 
 from agentest.core import AgentTrace
@@ -47,7 +45,8 @@ def _get_recorder(task: str = "auto-instrumented") -> Recorder:
 def _finalize_and_store(success: bool = True, error: str | None = None) -> AgentTrace:
     """Finalize current recorder and store the trace."""
     recorder = _get_recorder()
-    trace = recorder.finalize(success=success, error=error, _silent=True)
+    recorder._suppress_empty_warning = True
+    trace = recorder.finalize(success=success, error=error)
     with _lock:
         _global_traces.append(trace)
     if _exporter is not None:
@@ -127,320 +126,6 @@ def flush_trace(task: str | None = None) -> AgentTrace | None:
     return trace
 
 
-def _wrap_anthropic_create(original: Any) -> Any:
-    """Wrap anthropic.messages.create to auto-record."""
-
-    @functools.wraps(original)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        recorder = _get_recorder()
-        model = kwargs.get("model", "unknown")
-
-        # Record user messages and extract tool results
-        messages = kwargs.get("messages", [])
-        for msg in messages:
-            role = msg.get("role", "user")
-            content = msg.get("content", "")
-            if isinstance(content, list):
-                # Handle content blocks — extract tool results and text
-                text_parts = []
-                for block in content:
-                    if isinstance(block, dict):
-                        if block.get("type") == "tool_result":
-                            tool_use_id = block.get("tool_use_id")
-                            result_content = block.get("content", "")
-                            if tool_use_id:
-                                recorder.record_tool_result(tool_use_id, result_content)
-                        elif "text" in block:
-                            text_parts.append(block["text"])
-                content = " ".join(text_parts)
-            recorder.record_message(role, content)
-
-        start = time.time()
-        try:
-            response = original(*args, **kwargs)
-        except Exception as e:
-            recorder.record_llm_response(
-                model=model,
-                content=f"Error: {e}",
-                input_tokens=0,
-                output_tokens=0,
-                latency_ms=(time.time() - start) * 1000,
-            )
-            raise
-
-        latency_ms = (time.time() - start) * 1000
-
-        # Extract response data
-        content_text = ""
-        tool_calls_in_response = []
-
-        if hasattr(response, "content"):
-            for block in response.content:
-                if hasattr(block, "text"):
-                    content_text += block.text
-                elif hasattr(block, "type") and block.type == "tool_use":
-                    tool_calls_in_response.append(
-                        {
-                            "name": block.name,
-                            "arguments": block.input if hasattr(block, "input") else {},
-                            "id": block.id if hasattr(block, "id") else None,
-                        }
-                    )
-
-        input_tokens = (
-            getattr(response.usage, "input_tokens", 0) if hasattr(response, "usage") else 0
-        )
-        output_tokens = (
-            getattr(response.usage, "output_tokens", 0) if hasattr(response, "usage") else 0
-        )
-
-        recorder.record_llm_response(
-            model=model,
-            content=content_text,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            latency_ms=latency_ms,
-        )
-
-        # Record tool use blocks as tool calls and track IDs for result correlation
-        for tc in tool_calls_in_response:
-            recorder.record_tool_call(
-                name=tc["name"],
-                arguments=tc["arguments"],
-                result=None,
-            )
-            if tc.get("id"):
-                recorder._pending_tool_calls[tc["id"]] = len(recorder.trace.tool_calls) - 1
-
-        return response
-
-    return wrapper
-
-
-def _wrap_anthropic_create_async(original: Any) -> Any:
-    """Wrap anthropic async messages.create to auto-record."""
-
-    @functools.wraps(original)
-    async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        recorder = _get_recorder()
-        model = kwargs.get("model", "unknown")
-
-        messages = kwargs.get("messages", [])
-        for msg in messages:
-            role = msg.get("role", "user")
-            content = msg.get("content", "")
-            if isinstance(content, list):
-                text_parts = []
-                for block in content:
-                    if isinstance(block, dict):
-                        if block.get("type") == "tool_result":
-                            tool_use_id = block.get("tool_use_id")
-                            result_content = block.get("content", "")
-                            if tool_use_id:
-                                recorder.record_tool_result(tool_use_id, result_content)
-                        elif "text" in block:
-                            text_parts.append(block["text"])
-                content = " ".join(text_parts)
-            recorder.record_message(role, content)
-
-        start = time.time()
-        try:
-            response = await original(*args, **kwargs)
-        except Exception as e:
-            recorder.record_llm_response(
-                model=model,
-                content=f"Error: {e}",
-                input_tokens=0,
-                output_tokens=0,
-                latency_ms=(time.time() - start) * 1000,
-            )
-            raise
-
-        latency_ms = (time.time() - start) * 1000
-        content_text = ""
-        tool_calls_in_response = []
-
-        if hasattr(response, "content"):
-            for block in response.content:
-                if hasattr(block, "text"):
-                    content_text += block.text
-                elif hasattr(block, "type") and block.type == "tool_use":
-                    tool_calls_in_response.append(
-                        {
-                            "name": block.name,
-                            "arguments": block.input if hasattr(block, "input") else {},
-                            "id": block.id if hasattr(block, "id") else None,
-                        }
-                    )
-
-        input_tokens = (
-            getattr(response.usage, "input_tokens", 0) if hasattr(response, "usage") else 0
-        )
-        output_tokens = (
-            getattr(response.usage, "output_tokens", 0) if hasattr(response, "usage") else 0
-        )
-
-        recorder.record_llm_response(
-            model=model,
-            content=content_text,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            latency_ms=latency_ms,
-        )
-
-        for tc in tool_calls_in_response:
-            recorder.record_tool_call(name=tc["name"], arguments=tc["arguments"], result=None)
-            if tc.get("id"):
-                recorder._pending_tool_calls[tc["id"]] = len(recorder.trace.tool_calls) - 1
-
-        return response
-
-    return wrapper
-
-
-def _wrap_openai_create(original: Any) -> Any:
-    """Wrap openai.chat.completions.create to auto-record."""
-
-    @functools.wraps(original)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        recorder = _get_recorder()
-        model = kwargs.get("model", "unknown")
-
-        messages = kwargs.get("messages", [])
-        for msg in messages:
-            role = msg.get("role", "user")
-            content = msg.get("content", "") or ""
-            # Correlate OpenAI tool results (role: "tool" with tool_call_id)
-            if role == "tool" and msg.get("tool_call_id"):
-                recorder.record_tool_result(msg["tool_call_id"], content)
-            recorder.record_message(role, content)
-
-        start = time.time()
-        try:
-            response = original(*args, **kwargs)
-        except Exception as e:
-            recorder.record_llm_response(
-                model=model,
-                content=f"Error: {e}",
-                input_tokens=0,
-                output_tokens=0,
-                latency_ms=(time.time() - start) * 1000,
-            )
-            raise
-
-        latency_ms = (time.time() - start) * 1000
-
-        # Extract response
-        choice = response.choices[0] if hasattr(response, "choices") and response.choices else None
-        content_text = ""
-        if choice and hasattr(choice, "message"):
-            content_text = choice.message.content or ""
-
-            # Record tool calls from response
-            if hasattr(choice.message, "tool_calls") and choice.message.tool_calls:
-                for tc in choice.message.tool_calls:
-                    import json as _json
-
-                    try:
-                        args_dict = (
-                            _json.loads(tc.function.arguments) if tc.function.arguments else {}
-                        )
-                    except (ValueError, AttributeError):
-                        args_dict = {}
-                    recorder.record_tool_call(
-                        name=tc.function.name,
-                        arguments=args_dict,
-                        result=None,
-                    )
-                    tc_id = getattr(tc, "id", None)
-                    if tc_id:
-                        recorder._pending_tool_calls[tc_id] = len(recorder.trace.tool_calls) - 1
-
-        usage = response.usage if hasattr(response, "usage") else None
-        input_tokens = getattr(usage, "prompt_tokens", 0) if usage else 0
-        output_tokens = getattr(usage, "completion_tokens", 0) if usage else 0
-
-        recorder.record_llm_response(
-            model=model,
-            content=content_text,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            latency_ms=latency_ms,
-        )
-
-        return response
-
-    return wrapper
-
-
-def _wrap_openai_create_async(original: Any) -> Any:
-    """Wrap openai async chat.completions.create to auto-record."""
-
-    @functools.wraps(original)
-    async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        recorder = _get_recorder()
-        model = kwargs.get("model", "unknown")
-
-        messages = kwargs.get("messages", [])
-        for msg in messages:
-            role = msg.get("role", "user")
-            content = msg.get("content", "") or ""
-            if role == "tool" and msg.get("tool_call_id"):
-                recorder.record_tool_result(msg["tool_call_id"], content)
-            recorder.record_message(role, content)
-
-        start = time.time()
-        try:
-            response = await original(*args, **kwargs)
-        except Exception as e:
-            recorder.record_llm_response(
-                model=model,
-                content=f"Error: {e}",
-                input_tokens=0,
-                output_tokens=0,
-                latency_ms=(time.time() - start) * 1000,
-            )
-            raise
-
-        latency_ms = (time.time() - start) * 1000
-        choice = response.choices[0] if hasattr(response, "choices") and response.choices else None
-        content_text = ""
-        if choice and hasattr(choice, "message"):
-            content_text = choice.message.content or ""
-            if hasattr(choice.message, "tool_calls") and choice.message.tool_calls:
-                for tc in choice.message.tool_calls:
-                    import json as _json
-
-                    try:
-                        args_dict = (
-                            _json.loads(tc.function.arguments) if tc.function.arguments else {}
-                        )
-                    except (ValueError, AttributeError):
-                        args_dict = {}
-                    recorder.record_tool_call(
-                        name=tc.function.name, arguments=args_dict, result=None
-                    )
-                    tc_id = getattr(tc, "id", None)
-                    if tc_id:
-                        recorder._pending_tool_calls[tc_id] = len(recorder.trace.tool_calls) - 1
-
-        usage = response.usage if hasattr(response, "usage") else None
-        input_tokens = getattr(usage, "prompt_tokens", 0) if usage else 0
-        output_tokens = getattr(usage, "completion_tokens", 0) if usage else 0
-
-        recorder.record_llm_response(
-            model=model,
-            content=content_text,
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            latency_ms=latency_ms,
-        )
-
-        return response
-
-    return wrapper
-
-
 def instrument(
     anthropic: bool = True,
     openai: bool = True,
@@ -473,6 +158,11 @@ def instrument(
         try:
             import anthropic as anthropic_mod
 
+            from agentest.integrations._anthropic_patch import (
+                _wrap_anthropic_create,
+                _wrap_anthropic_create_async,
+            )
+
             # Patch sync client
             messages_cls = anthropic_mod.resources.messages.Messages
             _original_anthropic_create = messages_cls.create
@@ -490,6 +180,11 @@ def instrument(
     if openai:
         try:
             import openai as openai_mod
+
+            from agentest.integrations._openai_patch import (
+                _wrap_openai_create,
+                _wrap_openai_create_async,
+            )
 
             # Patch sync client
             completions_cls = openai_mod.resources.chat.completions.Completions

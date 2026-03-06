@@ -6,7 +6,12 @@ import functools
 from collections.abc import Callable
 from typing import Any
 
-__version__ = "1.0.2"
+try:
+    from importlib.metadata import version as _pkg_version
+
+    __version__ = _pkg_version("agentest")
+except Exception:
+    __version__ = "0.0.0-dev"
 
 from agentest.benchmark.comparison import ModelComparison, ModelScore
 from agentest.benchmark.runner import BenchmarkResult, BenchmarkRunner, BenchmarkTask

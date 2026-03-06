@@ -210,7 +210,7 @@ class TestDoctorCommand:
 
 class TestFrameworkDetection:
     def test_detect_framework(self):
-        from agentest.cli import _detect_framework
+        from agentest.cli._init import _detect_framework
 
         # Just verify it returns a string without error
         result = _detect_framework()

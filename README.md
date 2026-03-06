@@ -40,7 +40,7 @@ Agentest brings software engineering best practices to agent development:
 |---|---|
 | **Record & Replay** | Capture real agent sessions, replay them deterministically — no expensive LLM calls needed for testing |
 | **Tool Mocking** | Mock any tool call with a fluent, pytest-style API: `.when(...).returns(...)` |
-| **7 Built-in Evaluators** | Grade agents on task completion, safety, cost, latency, tool usage, and more |
+| **10 Built-in Evaluators** | Grade agents on task completion, safety, cost, latency, tool usage, and more |
 | **Model Comparison** | Run the same tasks across Claude, GPT, Gemini — compare pass rates, cost, and latency |
 | **MCP Server Testing** | Test MCP servers for protocol compliance and tool schema validation |
 | **pytest Plugin** | Drop-in integration with auto-registered fixtures and custom markers |
@@ -54,7 +54,7 @@ Agentest brings software engineering best practices to agent development:
 - **LLM-provider-agnostic** — Built-in cost tracking for Anthropic, OpenAI, and Google models.
 - **Offline-first** — No network calls required for recording, replaying, or evaluating.
 - **CI/CD ready** — GitHub Action for running evaluations in your pipeline.
-- **Minimal dependencies** — 6 core runtime deps. Optional extras for web UI and frameworks.
+- **Minimal dependencies** — 4 core runtime deps. Optional extras for web UI and frameworks.
 
 ## Quick Start
 
@@ -352,6 +352,9 @@ agentest serve --traces-dir traces/ --port 8000
 | `LatencyEvaluator` | Total duration and per-call latency against limits | 1.0 pass, 0.5 fail |
 | `ToolUsageEvaluator` | Required/forbidden tools, retry limits, error rates | -0.2 per issue (min 0.0) |
 | `LLMJudgeEvaluator` | LLM-graded evaluation against custom criteria (Anthropic or OpenAI) | LLM-assigned score |
+| `RubricEvaluator` | Multi-criteria rubric-based LLM evaluation with weighted scoring | Weighted average |
+| `MetricEvaluator` | Custom numeric metrics with thresholds (tokens/message, cost/tool, etc.) | Binary pass/fail |
+| `RegressionEvaluator` | Detects regressions against baseline traces (cost, latency, tool usage) | Binary pass/fail |
 | `CompositeEvaluator` | Combines multiple evaluators with AND/OR logic | Average of all scores |
 
 ## Architecture
@@ -361,17 +364,24 @@ agentest/
 ├── core.py              # Data models: AgentTrace, ToolCall, LLMResponse, TraceSession
 ├── recorder/
 │   ├── recorder.py      # Record agent sessions to YAML/JSON
-│   └── replayer.py      # Replay sessions deterministically
+│   ├── replayer.py      # Replay sessions deterministically
+│   └── streaming.py     # StreamingRecorder for real-time trace events
 ├── mocking/
 │   └── tool_mock.py     # ToolMock, MockToolkit — fluent builder + assertions
 ├── evaluators/
-│   ├── base.py          # Evaluator ABC, EvalResult, CompositeEvaluator, LLMJudge
-│   └── builtin.py       # TaskCompletion, Safety, Cost, Latency, ToolUsage
+│   ├── base.py          # Evaluator ABC, EvalResult, CompositeEvaluator, LLMJudge, Rubric
+│   ├── builtin.py       # TaskCompletion, Safety, Cost, Latency, ToolUsage
+│   ├── metrics.py       # Custom numeric metrics with thresholds
+│   └── _llm_utils.py    # Shared LLM judge utilities
 ├── benchmark/
 │   ├── runner.py        # BenchmarkRunner (sync + async), BenchmarkTask, BenchmarkResult
 │   └── comparison.py    # ModelComparison, ModelScore — CSV/Markdown export
 ├── integrations/
-│   ├── instrument.py    # Auto-instrumentation for anthropic/openai
+│   ├── instrument.py    # Auto-instrumentation entry point
+│   ├── _anthropic_patch.py # Anthropic client monkey-patching
+│   ├── _openai_patch.py # OpenAI client monkey-patching
+│   ├── middleware.py    # ASGI/WSGI middleware for FastAPI/Flask
+│   ├── otel.py          # OpenTelemetry trace export
 │   ├── langchain.py     # LangChain callback handler adapter
 │   ├── crewai.py        # CrewAI crew recorder
 │   ├── autogen.py       # AutoGen conversation recorder
@@ -380,14 +390,32 @@ agentest/
 │   └── openai_agents.py # OpenAI Agents SDK tracer
 ├── mcp_testing/
 │   ├── server_tester.py # MCPServerTester — subprocess-based JSON-RPC testing
-│   └── assertions.py    # MCPAssertions — fluent assertion chains
+│   ├── assertions.py    # MCPAssertions — fluent assertion chains
+│   └── security.py      # MCP security testing utilities
 ├── reporters/
 │   ├── console.py       # Rich console output
 │   └── json_reporter.py # Machine-readable JSON reports
 ├── server/
 │   └── app.py           # FastAPI web UI for trace exploration
+├── datasets.py          # Dataset management and test case splitting
+├── regression.py        # Regression detection against baselines
+├── stats.py             # Statistical analysis and SLO tracking
+├── snapshots.py         # Trace snapshot testing
 ├── pytest_plugin.py     # Auto-registered fixtures, markers, and trace collectors
-└── cli.py               # Click CLI with 8 commands
+└── cli/                 # Click CLI with 15+ commands
+    ├── _main.py         # CLI group and shared utilities
+    ├── _evaluate.py     # evaluate command
+    ├── _replay.py       # replay command
+    ├── _summary.py      # summary command
+    ├── _init.py         # init command with framework detection
+    ├── _doctor.py       # doctor command
+    ├── _diff.py         # diff command
+    ├── _regression.py   # regression command
+    ├── _stats.py        # stats command
+    ├── _dataset.py      # dataset group (create, list, split)
+    ├── _snapshot.py     # snapshot group (save, check, check-dir)
+    ├── _serve.py        # serve and ui commands
+    └── _watch.py        # watch command
 ```
 
 ### Design Principles

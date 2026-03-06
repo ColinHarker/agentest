@@ -33,6 +33,7 @@ class Recorder:
         self.trace = AgentTrace(task=task, metadata=metadata or {})
         self._active = True
         self._pending_tool_calls: dict[str, int] = {}  # tool_use_id -> index in tool_calls
+        self._suppress_empty_warning: bool = False
 
     def record_message(self, role: str | Role, content: str) -> Message:
         """Record a conversation message."""
@@ -183,7 +184,7 @@ class Recorder:
         return recorder.finalize(success=success)
 
     def finalize(
-        self, success: bool = True, error: str | None = None, _silent: bool = False
+        self, success: bool = True, error: str | None = None,
     ) -> AgentTrace:
         """Finalize the recording and return the trace.
 
@@ -192,7 +193,7 @@ class Recorder:
             error: Optional error message if the task failed.
         """
         if (
-            not _silent
+            not self._suppress_empty_warning
             and not self.trace.llm_responses
             and not self.trace.tool_calls
             and not self.trace.messages

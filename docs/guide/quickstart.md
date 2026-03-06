@@ -139,6 +139,65 @@ agentest doctor
 
 Shows which SDKs are installed, whether the pytest plugin is registered, and what traces you have saved.
 
+## Convenience APIs
+
+Agentest provides three convenience functions for quick integration without manually managing recorders.
+
+### `agentest.run()`
+
+Run a function, auto-instrument LLM clients, and return both the result and the captured trace.
+
+```python
+agentest.run(fn, *args, task="", **kwargs) -> (result, AgentTrace)
+```
+
+If LLM clients are not already instrumented, `run()` instruments them for the duration of the call and restores the original state afterward.
+
+```python
+import agentest
+
+def my_agent(prompt):
+    # calls LLM, uses tools, etc.
+    return "done"
+
+result, trace = agentest.run(my_agent, "Summarize README.md", task="Summarize")
+print(f"Tokens used: {trace.total_tokens}, Cost: ${trace.total_cost:.4f}")
+```
+
+### `@agentest.trace()`
+
+Decorator version of `run()`. The decorated function returns `(result, AgentTrace)` instead of just the result. If `task` is not specified, it defaults to the function name.
+
+```python
+@agentest.trace(task="Summarize document")
+def my_agent(prompt):
+    return client.messages.create(...)
+
+result, trace = my_agent("Summarize README.md")
+```
+
+### `agentest.evaluate()`
+
+Run the default evaluator suite against a trace. Evaluates task completion and tool usage by default. Optionally checks safety and enforces cost/token budgets.
+
+```python
+agentest.evaluate(
+    trace: AgentTrace,
+    max_cost: float | None = None,
+    max_tokens: int | None = None,
+    check_safety: bool = True,
+) -> list[EvalResult]
+```
+
+```python
+import agentest
+
+result, trace = agentest.run(my_agent, "Summarize README.md", task="Summarize")
+results = agentest.evaluate(trace, max_cost=0.50, max_tokens=50000)
+for r in results:
+    print(f"{r.evaluator}: {'PASS' if r.passed else 'FAIL'} (score={r.score:.2f})")
+```
+
 ## Next Steps
 
 - [Framework Integrations](./integrations.md) — LangChain, CrewAI, AutoGen, LlamaIndex adapters

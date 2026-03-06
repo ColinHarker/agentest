@@ -194,66 +194,16 @@ Respond with ONLY a JSON object (no other text):
 
     def _call_llm(self, prompt: str) -> str:
         """Send the prompt to the configured LLM and return the response text."""
-        # Support both Anthropic and OpenAI clients
-        if hasattr(self.client, "messages"):
-            # Anthropic
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=200,
-                temperature=0,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            result: str = response.content[0].text
-            return result
-        elif hasattr(self.client, "chat"):
-            # OpenAI — use JSON response format for structured output
-            response = self.client.chat.completions.create(
-                model=self.model,
-                max_tokens=200,
-                temperature=0,
-                response_format={"type": "json_object"},
-                messages=[{"role": "user", "content": prompt}],
-            )
-            return response.choices[0].message.content or ""
-        else:
-            raise TypeError(f"Unsupported client type: {type(self.client)}")
+        from agentest.evaluators._llm_utils import call_judge_llm
+
+        return call_judge_llm(self.client, self.model, prompt)
 
     @staticmethod
     def _parse_response(response: str) -> tuple[float, str]:
-        """Parse score and reasoning from the LLM response.
+        """Parse score and reasoning from the LLM response."""
+        from agentest.evaluators._llm_utils import parse_judge_response
 
-        Tries JSON first, falls back to line-based parsing for backward compat.
-        """
-        import json as _json
-
-        # Try JSON first
-        text = response.strip()
-        try:
-            # Strip markdown code fences if present
-            if text.startswith("```"):
-                text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-            data = _json.loads(text)
-            score = max(0.0, min(1.0, float(data.get("score", 0.5))))
-            reasoning = str(data.get("reasoning", ""))
-            return score, reasoning
-        except (_json.JSONDecodeError, ValueError, KeyError, TypeError):
-            pass
-
-        # Fall back to line-based parsing
-        score = 0.5
-        reasoning = response.strip()
-
-        for line in response.strip().split("\n"):
-            if line.startswith("SCORE:"):
-                try:
-                    score = float(line.split(":", 1)[1].strip())
-                    score = max(0.0, min(1.0, score))
-                except ValueError:
-                    pass
-            elif line.startswith("REASONING:"):
-                reasoning = line.split(":", 1)[1].strip()
-
-        return score, reasoning
+        return parse_judge_response(response)
 
 
 class RubricEvaluator(Evaluator):
@@ -325,7 +275,7 @@ class RubricEvaluator(Evaluator):
 
     def _score_criterion(self, trace: AgentTrace, criterion: str) -> tuple[float, str]:
         """Ask the LLM to score a single criterion and return (score, reasoning)."""
-        import json as _json
+        from agentest.evaluators._llm_utils import call_judge_llm, parse_judge_response
 
         tool_summary = "\n".join(
             f"  - {tc.name}({tc.arguments}) -> {tc.result}" for tc in trace.tool_calls[:20]
@@ -353,37 +303,7 @@ Respond with ONLY a JSON object (no other text):
 {{"score": <number between 0.0 and 1.0>, "reasoning": "<one sentence explanation>"}}"""
 
         try:
-            if hasattr(self.client, "messages"):
-                # Anthropic
-                response = self.client.messages.create(
-                    model=self.model,
-                    max_tokens=200,
-                    temperature=0,
-                    messages=[{"role": "user", "content": prompt}],
-                )
-                text: str = response.content[0].text
-            elif hasattr(self.client, "chat"):
-                # OpenAI
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    max_tokens=200,
-                    temperature=0,
-                    response_format={"type": "json_object"},
-                    messages=[{"role": "user", "content": prompt}],
-                )
-                text = response.choices[0].message.content or ""
-            else:
-                raise TypeError(f"Unsupported client type: {type(self.client)}")
-
-            # Parse JSON response
-            raw = text.strip()
-            if raw.startswith("```"):
-                raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-            data = _json.loads(raw)
-            score = max(0.0, min(1.0, float(data.get("score", 0.5))))
-            reasoning = str(data.get("reasoning", ""))
-            return score, reasoning
-        except (_json.JSONDecodeError, ValueError, KeyError, TypeError):
-            return 0.5, "Failed to parse LLM response"
+            text = call_judge_llm(self.client, self.model, prompt)
+            return parse_judge_response(text)
         except Exception as e:
             return 0.5, f"Error scoring criterion: {e}"
