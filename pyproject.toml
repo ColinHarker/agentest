@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agentest"
-version = "0.2.0"
+version = "1.0.2"
 description = "Universal agent testing and evaluation toolkit - record, replay, mock, and benchmark AI agents"
 readme = "README.md"
 license = "MIT"

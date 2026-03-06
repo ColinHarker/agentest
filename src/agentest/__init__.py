@@ -1,6 +1,6 @@
 """Agentest - Universal agent testing and evaluation toolkit."""
 
-__version__ = "0.2.0"
+__version__ = "1.0.2"
 
 from agentest.benchmark.comparison import ModelComparison, ModelScore
 from agentest.benchmark.runner import BenchmarkResult, BenchmarkRunner, BenchmarkTask

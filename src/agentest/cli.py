@@ -29,7 +29,7 @@ reporter = ConsoleReporter(console)
 
 
 @click.group()
-@click.version_option(version="0.2.0", prog_name="agentest")
+@click.version_option(version="1.0.2", prog_name="agentest")
 def main() -> None:
     """Agentest - Universal agent testing and evaluation toolkit."""
     pass
