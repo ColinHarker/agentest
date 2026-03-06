@@ -8,6 +8,16 @@ from agentest.evaluators.builtin import (
     TaskCompletionEvaluator,
     ToolUsageEvaluator,
 )
+from agentest.evaluators.metrics import (
+    CostPerTokenMetric,
+    ErrorRateMetric,
+    LLMCallCountMetric,
+    Metric,
+    MetricEvaluator,
+    MetricResult,
+    TokenEfficiencyMetric,
+    ToolCallCountMetric,
+)
 
 __all__ = [
     "Evaluator",
@@ -17,4 +27,12 @@ __all__ = [
     "CostEvaluator",
     "LatencyEvaluator",
     "ToolUsageEvaluator",
+    "Metric",
+    "MetricResult",
+    "MetricEvaluator",
+    "TokenEfficiencyMetric",
+    "ErrorRateMetric",
+    "CostPerTokenMetric",
+    "ToolCallCountMetric",
+    "LLMCallCountMetric",
 ]

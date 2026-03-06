@@ -423,6 +423,269 @@ def diff(trace_a: str, trace_b: str, fmt: str) -> None:
 
 
 @main.command()
+@click.argument("traces_dir", type=click.Path(exists=True))
+@click.option("--baseline", type=click.Path(exists=True), required=True, help="Baseline dir.")
+@click.option("--update-baseline", is_flag=True, default=False, help="Update baselines.")
+@click.option("--format", "fmt", type=click.Choice(["table", "json"]), default="table")
+@click.option("--cost-threshold", type=float, default=0.1, help="Cost threshold (0.1=10%).")
+@click.option("--token-threshold", type=float, default=0.1, help="Token regression threshold.")
+@click.option("--latency-threshold", type=float, default=0.2, help="Latency regression threshold.")
+def regression(
+    traces_dir: str,
+    baseline: str,
+    update_baseline: bool,
+    fmt: str,
+    cost_threshold: float,
+    token_threshold: float,
+    latency_threshold: float,
+) -> None:
+    """Detect regressions by comparing traces against baselines."""
+    from agentest.regression import RegressionDetector, RegressionThresholds
+
+    thresholds = RegressionThresholds(
+        cost_increase=cost_threshold,
+        token_increase=token_threshold,
+        latency_increase=latency_threshold,
+    )
+    detector = RegressionDetector(baseline_dir=baseline, thresholds=thresholds)
+    results = detector.check_all(traces_dir)
+
+    if not results:
+        console.print("[yellow]No traces found.[/yellow]")
+        return
+
+    if fmt == "json":
+        console.print(json.dumps([r.model_dump() for r in results], indent=2, default=str))
+    else:
+        from rich.table import Table
+        from rich.text import Text
+
+        table = Table(title="Regression Report", show_lines=True)
+        table.add_column("Task", style="cyan", max_width=40)
+        table.add_column("Status", justify="center")
+        table.add_column("Regressions", justify="center")
+        table.add_column("Improvements", justify="center")
+        table.add_column("Details")
+
+        for r in results:
+            status = Text("PASS", style="green") if r.passed else Text("FAIL", style="red")
+            details = ""
+            if r.regressions:
+                details = "; ".join(f"{reg.metric}: {reg.change_pct:+.1%}" for reg in r.regressions)
+            table.add_row(
+                r.task[:40],
+                status,
+                str(len(r.regressions)),
+                str(len(r.improvements)),
+                details,
+            )
+
+        console.print(table)
+
+        total = len(results)
+        passed = sum(1 for r in results if r.passed)
+        console.print(f"\n{passed}/{total} tasks passed regression checks")
+
+    if update_baseline:
+        for r in results:
+            trace_path = Path(traces_dir)
+            for f in sorted(trace_path.iterdir()):
+                if f.suffix in (".yaml", ".yml", ".json"):
+                    try:
+                        trace = Recorder.load(f)
+                        if trace.task == r.task:
+                            detector.update_baseline(trace)
+                            console.print(f"  Updated baseline: {r.task}")
+                            break
+                    except Exception:
+                        continue
+
+    if any(not r.passed for r in results):
+        sys.exit(1)
+
+
+@main.command()
+@click.argument("history_file", type=click.Path())
+@click.option("--task", type=str, default=None, help="Filter to a specific task.")
+@click.option("--trend", "show_trend", is_flag=True, help="Show trend analysis.")
+@click.option("--ci", "show_ci", is_flag=True, help="Show confidence intervals.")
+@click.option(
+    "--slo",
+    "slo_defs",
+    multiple=True,
+    help="SLO definition: metric:target:comparison (e.g. cost:0.5:lte).",
+)
+@click.option("--format", "fmt", type=click.Choice(["table", "json"]), default="table")
+def stats(
+    history_file: str,
+    task: str | None,
+    show_trend: bool,
+    show_ci: bool,
+    slo_defs: tuple[str, ...],
+    fmt: str,
+) -> None:
+    """Analyze performance statistics from run history."""
+    from agentest.stats import SLO, StatsAnalyzer
+
+    analyzer = StatsAnalyzer.load(history_file)
+
+    if not analyzer.samples:
+        console.print("[yellow]No history data found.[/yellow]")
+        return
+
+    tasks = [task] if task else list(analyzer.samples.keys())
+    output: dict = {"tasks": {}}
+
+    for t in tasks:
+        task_data: dict = {}
+
+        if show_trend:
+            for metric in ["score", "cost", "tokens", "latency_ms"]:
+                trend_result = analyzer.trend(t, metric=metric)
+                task_data.setdefault("trends", {})[metric] = {
+                    "direction": trend_result.direction.value,
+                    "slope": trend_result.slope,
+                    "r_squared": trend_result.r_squared,
+                    "samples": trend_result.samples,
+                }
+
+        if show_ci:
+            for metric in ["score", "cost", "tokens"]:
+                ci = analyzer.confidence_interval(t, metric=metric)
+                task_data.setdefault("confidence_intervals", {})[metric] = {
+                    "mean": ci.mean,
+                    "ci_lower": ci.ci_lower,
+                    "ci_upper": ci.ci_upper,
+                    "std": ci.std,
+                    "samples": ci.samples,
+                }
+
+        if slo_defs:
+            slo_results = []
+            for slo_def in slo_defs:
+                parts = slo_def.split(":")
+                if len(parts) != 3:
+                    msg = f"Invalid SLO: {slo_def} (expected metric:target:comparison)"
+                    err_console.print(f"[yellow]{msg}[/yellow]")
+                    continue
+                slo = SLO(metric=parts[0], target=float(parts[1]), comparison=parts[2])
+                slo_result = analyzer.check_slo(t, slo)
+                slo_results.append(
+                    {
+                        "metric": slo.metric,
+                        "target": slo.target,
+                        "comparison": slo.comparison,
+                        "compliant": slo_result.compliant,
+                        "compliance_rate": slo_result.compliance_rate,
+                        "current_value": slo_result.current_value,
+                    }
+                )
+            task_data["slos"] = slo_results
+
+        output["tasks"][t] = task_data
+
+    if fmt == "json":
+        console.print(json.dumps(output, indent=2, default=str))
+    else:
+        for t in tasks:
+            console.print(
+                f"\n[bold cyan]{t}[/bold cyan] ({len(analyzer.samples.get(t, []))} samples)"
+            )
+
+            task_data = output["tasks"].get(t, {})
+
+            if "trends" in task_data:
+                console.print("  [bold]Trends:[/bold]")
+                for metric, info in task_data["trends"].items():
+                    direction = info["direction"]
+                    if direction == "improving":
+                        style = "green"
+                    elif direction == "degrading":
+                        style = "red"
+                    else:
+                        style = ""
+                    console.print(
+                        f"    {metric}: [{style}]{direction}[/{style}] "
+                        f"(slope={info['slope']:.4f}, R\u00b2={info['r_squared']:.2f})"
+                    )
+
+            if "confidence_intervals" in task_data:
+                console.print("  [bold]95% Confidence Intervals:[/bold]")
+                for metric, info in task_data["confidence_intervals"].items():
+                    console.print(
+                        f"    {metric}: {info['mean']:.4f} "
+                        f"[{info['ci_lower']:.4f}, {info['ci_upper']:.4f}]"
+                    )
+
+            if "slos" in task_data:
+                console.print("  [bold]SLO Compliance:[/bold]")
+                for slo_info in task_data["slos"]:
+                    status = "[green]OK[/green]" if slo_info["compliant"] else "[red]BREACH[/red]"
+                    console.print(
+                        f"    {slo_info['metric']} {slo_info['comparison']} {slo_info['target']}: "
+                        f"{status} (rate={slo_info['compliance_rate']:.1%})"
+                    )
+
+
+@main.group()
+def dataset() -> None:
+    """Manage test datasets."""
+    pass
+
+
+@dataset.command("create")
+@click.argument("name")
+@click.option("--output", "-o", type=click.Path(), default=None, help="Output path.")
+@click.option("--description", "-d", type=str, default="", help="Dataset description.")
+def dataset_create(name: str, output: str | None, description: str) -> None:
+    """Create a new empty dataset."""
+    from agentest.datasets import Dataset
+
+    ds = Dataset(name=name, description=description)
+    path = output or f"datasets/{name}.yaml"
+    ds.save(path)
+    console.print(f"Created dataset: [cyan]{path}[/cyan]")
+
+
+@dataset.command("list")
+@click.argument("path", type=click.Path(exists=True))
+def dataset_list(path: str) -> None:
+    """List test cases in a dataset."""
+    from agentest.datasets import Dataset
+
+    ds = Dataset.load(path)
+    console.print(f"[bold]{ds.name}[/bold] v{ds.version} ({ds.size} test cases)")
+
+    if ds.description:
+        console.print(f"  {ds.description}")
+
+    for tc in ds.test_cases:
+        tags = f" [{', '.join(tc.tags)}]" if tc.tags else ""
+        console.print(f"  - {tc.name}: {tc.task}{tags}")
+
+
+@dataset.command("split")
+@click.argument("path", type=click.Path(exists=True))
+@click.option("--ratio", type=float, default=0.5, help="Split ratio for group A.")
+@click.option("--seed", type=int, default=42, help="Random seed.")
+@click.option("--output-dir", "-o", type=click.Path(), default=None, help="Output directory.")
+def dataset_split(path: str, ratio: float, seed: int, output_dir: str | None) -> None:
+    """Split a dataset into two groups for A/B testing."""
+    from agentest.datasets import Dataset
+
+    ds = Dataset.load(path)
+    a, b = ds.split(ratio=ratio, seed=seed)
+
+    out_dir = Path(output_dir) if output_dir else Path(path).parent
+    path_a = a.save(out_dir / f"{ds.name}_A.yaml")
+    path_b = b.save(out_dir / f"{ds.name}_B.yaml")
+
+    console.print(f"Split {ds.name} ({ds.size} cases) into:")
+    console.print(f"  Group A: {a.size} cases -> [cyan]{path_a}[/cyan]")
+    console.print(f"  Group B: {b.size} cases -> [cyan]{path_b}[/cyan]")
+
+
+@main.command()
 @click.argument("trace_dir", type=click.Path(exists=True))
 @click.option("--interval", "-i", default=2.0, type=float, help="Polling interval in seconds.")
 @click.option("--max-cost", type=float, default=None, help="Max cost budget in USD.")
