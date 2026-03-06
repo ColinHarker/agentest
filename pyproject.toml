@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agentest"
-version = "0.2.0"
+version = "1.0.2"
 description = "Universal agent testing and evaluation toolkit - record, replay, mock, and benchmark AI agents"
 readme = "README.md"
 license = "MIT"
@@ -46,8 +46,9 @@ langchain = ["langchain-core>=0.3.0"]
 crewai = ["crewai>=0.80.0"]
 autogen = ["autogen-agentchat>=0.4.0"]
 llamaindex = ["llama-index-core>=0.11.0"]
+flask = ["flask>=3.0"]
 all = [
-    "agentest[web,anthropic,openai,langchain,crewai,autogen,llamaindex]",
+    "agentest[web,anthropic,openai,langchain,crewai,autogen,llamaindex,flask]",
 ]
 dev = [
     "pytest>=8.0",

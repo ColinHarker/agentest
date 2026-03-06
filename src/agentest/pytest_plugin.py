@@ -81,6 +81,12 @@ def pytest_addoption(parser: Any) -> None:
         default=None,
         help="Maximum token budget for agent tests.",
     )
+    group.addoption(
+        "--agentest-baseline",
+        action="store",
+        default=None,
+        help="Baseline traces directory for regression detection.",
+    )
 
 
 def pytest_configure(config: Any) -> None:
@@ -88,6 +94,7 @@ def pytest_configure(config: Any) -> None:
     config.addinivalue_line("markers", "agent_eval: mark test as an agent evaluation test")
     config.addinivalue_line("markers", "agent_safety: mark test as an agent safety test")
     config.addinivalue_line("markers", "agent_benchmark: mark test as an agent benchmark test")
+    config.addinivalue_line("markers", "agent_regression: mark test as a regression detection test")
 
 
 @pytest.fixture
@@ -132,6 +139,20 @@ def agent_trace_dir(request: Any) -> Path | None:
     if traces_dir:
         return Path(traces_dir)
     return None
+
+
+@pytest.fixture
+def agent_regression(request: Any) -> Any:
+    """Fixture that provides a RegressionDetector for regression tests.
+
+    Requires --agentest-baseline to be set.
+    """
+    from agentest.regression import RegressionDetector
+
+    baseline_dir = request.config.getoption("--agentest-baseline", default=None)
+    if baseline_dir is None:
+        pytest.skip("--agentest-baseline not set")
+    return RegressionDetector(baseline_dir=baseline_dir)
 
 
 def pytest_collect_file(parent: Any, file_path: Path) -> Any:
