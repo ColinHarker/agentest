@@ -173,7 +173,7 @@ class AgentTraceItem(pytest.Item):
             failures = "\n".join(f"  {r.evaluator}: {r.message}" for r in failed)
             raise AgentTraceTestError(f"Agent trace evaluation failed:\n{failures}")
 
-    def repr_failure(self, excinfo: Any, **kwargs: Any) -> str:
+    def repr_failure(self, excinfo: Any, style: Any = None) -> str:
         return str(excinfo.value)
 
     def reportinfo(self) -> tuple[Path, None, str]:

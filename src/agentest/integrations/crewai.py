@@ -92,15 +92,16 @@ def record_crew(
             )
 
         # Extract task results if available
-        if hasattr(result, "tasks_output"):
-            for task_output in result.tasks_output:
+        if result is not None and hasattr(result, "tasks_output"):
+            tasks_output = result.tasks_output
+            for task_output in tasks_output:
                 task_name = getattr(task_output, "description", "task")[:50]
                 task_result = getattr(task_output, "raw", str(task_output))
                 recorder.record_tool_call(
                     name=f"crew_task:{task_name}",
                     arguments={},
                     result=task_result,
-                    duration_ms=duration_ms / max(len(result.tasks_output), 1),
+                    duration_ms=duration_ms / max(len(tasks_output), 1),
                 )
 
         trace = recorder.finalize(

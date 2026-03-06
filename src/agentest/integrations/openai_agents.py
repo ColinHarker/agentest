@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import contextlib
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from typing import Any
 
 from agentest.core import AgentTrace
@@ -195,7 +195,7 @@ class AgentestTracer:
                     )
 
     @contextlib.contextmanager
-    def recording(self):
+    def recording(self) -> Generator[Recorder, None, None]:
         """Context manager for manual recording.
 
         Yields:

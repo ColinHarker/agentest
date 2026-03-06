@@ -277,7 +277,7 @@ class LatencyEvaluator(Evaluator):
             ]
             if slow_calls:
                 issues.append(f"{len(slow_calls)} tool calls exceeded {self.max_per_call_ms:.0f}ms")
-                details["slow_calls"] = [
+                details["slow_calls"] = [  # type: ignore[assignment]
                     {"name": tc.name, "duration_ms": tc.duration_ms} for tc in slow_calls
                 ]
 

@@ -67,7 +67,7 @@ def create_app(traces_dir: str = "traces") -> FastAPI:
     # ---- API Routes ----
 
     @app.get("/", response_class=HTMLResponse)
-    async def index():
+    async def index() -> HTMLResponse:
         """Serve the main UI."""
         html_path = STATIC_DIR / "index.html"
         if html_path.exists():
@@ -75,7 +75,7 @@ def create_app(traces_dir: str = "traces") -> FastAPI:
         return HTMLResponse("<h1>Agentest UI</h1><p>Static files not found.</p>")
 
     @app.get("/api/traces")
-    async def list_traces():
+    async def list_traces() -> dict[str, Any]:
         """List all traces with summary data."""
         traces = _load_traces()
         summaries = []
@@ -109,7 +109,7 @@ def create_app(traces_dir: str = "traces") -> FastAPI:
         return {"traces": summaries, "total": len(summaries)}
 
     @app.get("/api/traces/{trace_id}")
-    async def get_trace(trace_id: str):
+    async def get_trace(trace_id: str) -> dict[str, Any]:
         """Get a full trace by ID."""
         trace = _load_trace(trace_id)
         if not trace:
@@ -132,7 +132,7 @@ def create_app(traces_dir: str = "traces") -> FastAPI:
         max_time_ms: float | None = None
 
     @app.post("/api/evaluate")
-    async def evaluate_trace(req: EvaluateRequest):
+    async def evaluate_trace(req: EvaluateRequest) -> dict[str, Any]:
         """Run evaluations on a trace."""
         trace = _load_trace(req.trace_id)
         if not trace:
@@ -160,7 +160,7 @@ def create_app(traces_dir: str = "traces") -> FastAPI:
         }
 
     @app.get("/api/dashboard")
-    async def dashboard_stats():
+    async def dashboard_stats() -> dict[str, Any]:
         """Get dashboard overview statistics."""
         traces = _load_traces()
         if not traces:
@@ -204,19 +204,19 @@ def create_app(traces_dir: str = "traces") -> FastAPI:
                     tool_errors[tc.name] = tool_errors.get(tc.name, 0) + 1
 
         # Recent traces
-        recent = sorted(traces, key=lambda t: t.get("start_time", 0), reverse=True)[:10]
+        recent = sorted(traces, key=lambda d: d.get("start_time", 0), reverse=True)[:10]
         recent_summaries = []
-        for t in recent:
-            trace_obj = AgentTrace.model_validate(t)
+        for raw in recent:
+            trace_obj = AgentTrace.model_validate(raw)
             recent_summaries.append(
                 {
-                    "id": t["id"],
-                    "task": t.get("task", "")[:80],
-                    "success": t.get("success"),
+                    "id": raw["id"],
+                    "task": raw.get("task", "")[:80],
+                    "success": raw.get("success"),
                     "total_cost": trace_obj.total_cost,
                     "total_tokens": trace_obj.total_tokens,
                     "duration_ms": trace_obj.duration_ms,
-                    "start_time": t.get("start_time"),
+                    "start_time": raw.get("start_time"),
                 }
             )
 
@@ -245,7 +245,7 @@ def create_app(traces_dir: str = "traces") -> FastAPI:
         error: str | None = None
 
     @app.post("/api/traces")
-    async def save_trace(req: SaveTraceRequest):
+    async def save_trace(req: SaveTraceRequest) -> dict[str, Any]:
         """Save a new trace."""
         recorder = Recorder(task=req.task, metadata=req.metadata)
 
@@ -281,7 +281,7 @@ def create_app(traces_dir: str = "traces") -> FastAPI:
         return {"id": trace.id, "file": filename}
 
     @app.delete("/api/traces/{trace_id}")
-    async def delete_trace(trace_id: str):
+    async def delete_trace(trace_id: str) -> dict[str, Any]:
         """Delete a trace."""
         for f in traces_path.iterdir():
             if f.suffix in (".yaml", ".yml", ".json"):
@@ -297,7 +297,7 @@ def create_app(traces_dir: str = "traces") -> FastAPI:
     @app.post("/api/evaluate/batch")
     async def evaluate_batch(
         evaluators: list[str] = ["task_completion", "safety", "cost", "tool_usage"],
-    ):
+    ) -> dict[str, Any]:
         """Evaluate all traces with the given evaluators."""
         traces = _load_traces()
         results = []
@@ -340,7 +340,7 @@ def create_app(traces_dir: str = "traces") -> FastAPI:
         trace_id_b: str
 
     @app.post("/api/diff")
-    async def diff_traces_api(req: DiffRequest):
+    async def diff_traces_api(req: DiffRequest) -> dict[str, Any]:
         """Compare two traces and return a structured diff."""
         trace_a = _load_trace(req.trace_id_a)
         trace_b = _load_trace(req.trace_id_b)
