@@ -103,16 +103,24 @@ def _wrap_anthropic_create(original: Any) -> Any:
         recorder = _get_recorder()
         model = kwargs.get("model", "unknown")
 
-        # Record user messages if present
+        # Record user messages and extract tool results
         messages = kwargs.get("messages", [])
         for msg in messages:
             role = msg.get("role", "user")
             content = msg.get("content", "")
             if isinstance(content, list):
-                # Handle content blocks
-                content = " ".join(
-                    block.get("text", "") for block in content if isinstance(block, dict)
-                )
+                # Handle content blocks — extract tool results and text
+                text_parts = []
+                for block in content:
+                    if isinstance(block, dict):
+                        if block.get("type") == "tool_result":
+                            tool_use_id = block.get("tool_use_id")
+                            result_content = block.get("content", "")
+                            if tool_use_id:
+                                recorder.record_tool_result(tool_use_id, result_content)
+                        elif "text" in block:
+                            text_parts.append(block["text"])
+                content = " ".join(text_parts)
             recorder.record_message(role, content)
 
         start = time.time()
@@ -162,13 +170,15 @@ def _wrap_anthropic_create(original: Any) -> Any:
             latency_ms=latency_ms,
         )
 
-        # Record tool use blocks as tool calls
+        # Record tool use blocks as tool calls and track IDs for result correlation
         for tc in tool_calls_in_response:
             recorder.record_tool_call(
                 name=tc["name"],
                 arguments=tc["arguments"],
-                result=None,  # Result comes from tool_result message
+                result=None,
             )
+            if tc.get("id"):
+                recorder._pending_tool_calls[tc["id"]] = len(recorder.trace.tool_calls) - 1
 
         return response
 
@@ -188,9 +198,17 @@ def _wrap_anthropic_create_async(original: Any) -> Any:
             role = msg.get("role", "user")
             content = msg.get("content", "")
             if isinstance(content, list):
-                content = " ".join(
-                    block.get("text", "") for block in content if isinstance(block, dict)
-                )
+                text_parts = []
+                for block in content:
+                    if isinstance(block, dict):
+                        if block.get("type") == "tool_result":
+                            tool_use_id = block.get("tool_use_id")
+                            result_content = block.get("content", "")
+                            if tool_use_id:
+                                recorder.record_tool_result(tool_use_id, result_content)
+                        elif "text" in block:
+                            text_parts.append(block["text"])
+                content = " ".join(text_parts)
             recorder.record_message(role, content)
 
         start = time.time()
@@ -219,6 +237,7 @@ def _wrap_anthropic_create_async(original: Any) -> Any:
                         {
                             "name": block.name,
                             "arguments": block.input if hasattr(block, "input") else {},
+                            "id": block.id if hasattr(block, "id") else None,
                         }
                     )
 
@@ -239,6 +258,8 @@ def _wrap_anthropic_create_async(original: Any) -> Any:
 
         for tc in tool_calls_in_response:
             recorder.record_tool_call(name=tc["name"], arguments=tc["arguments"], result=None)
+            if tc.get("id"):
+                recorder._pending_tool_calls[tc["id"]] = len(recorder.trace.tool_calls) - 1
 
         return response
 
@@ -255,7 +276,12 @@ def _wrap_openai_create(original: Any) -> Any:
 
         messages = kwargs.get("messages", [])
         for msg in messages:
-            recorder.record_message(msg.get("role", "user"), msg.get("content", "") or "")
+            role = msg.get("role", "user")
+            content = msg.get("content", "") or ""
+            # Correlate OpenAI tool results (role: "tool" with tool_call_id)
+            if role == "tool" and msg.get("tool_call_id"):
+                recorder.record_tool_result(msg["tool_call_id"], content)
+            recorder.record_message(role, content)
 
         start = time.time()
         try:
@@ -294,6 +320,9 @@ def _wrap_openai_create(original: Any) -> Any:
                         arguments=args_dict,
                         result=None,
                     )
+                    tc_id = getattr(tc, "id", None)
+                    if tc_id:
+                        recorder._pending_tool_calls[tc_id] = len(recorder.trace.tool_calls) - 1
 
         usage = response.usage if hasattr(response, "usage") else None
         input_tokens = getattr(usage, "prompt_tokens", 0) if usage else 0
@@ -322,7 +351,11 @@ def _wrap_openai_create_async(original: Any) -> Any:
 
         messages = kwargs.get("messages", [])
         for msg in messages:
-            recorder.record_message(msg.get("role", "user"), msg.get("content", "") or "")
+            role = msg.get("role", "user")
+            content = msg.get("content", "") or ""
+            if role == "tool" and msg.get("tool_call_id"):
+                recorder.record_tool_result(msg["tool_call_id"], content)
+            recorder.record_message(role, content)
 
         start = time.time()
         try:
@@ -355,6 +388,9 @@ def _wrap_openai_create_async(original: Any) -> Any:
                     recorder.record_tool_call(
                         name=tc.function.name, arguments=args_dict, result=None
                     )
+                    tc_id = getattr(tc, "id", None)
+                    if tc_id:
+                        recorder._pending_tool_calls[tc_id] = len(recorder.trace.tool_calls) - 1
 
         usage = response.usage if hasattr(response, "usage") else None
         input_tokens = getattr(usage, "prompt_tokens", 0) if usage else 0

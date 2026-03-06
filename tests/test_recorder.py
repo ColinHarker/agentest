@@ -159,6 +159,44 @@ def test_recorder_context_manager_error():
     assert rec.trace.error == "something broke"
 
 
+def test_recorder_wrap_tool_positional_args():
+    """wrap_tool should record positional args as named kwargs."""
+    rec = Recorder(task="Positional test")
+
+    def read_file(path: str, encoding: str = "utf-8") -> str:
+        return f"contents of {path}"
+
+    wrapped = rec.wrap_tool("read_file", read_file)
+    result = wrapped("doc.txt")
+
+    assert result == "contents of doc.txt"
+    assert len(rec.trace.tool_calls) == 1
+    assert rec.trace.tool_calls[0].arguments["path"] == "doc.txt"
+    assert rec.trace.tool_calls[0].arguments["encoding"] == "utf-8"
+
+
+@pytest.mark.asyncio
+async def test_recorder_async_context_manager():
+    """Recorder should work as an async context manager."""
+    async with Recorder(task="Async test") as rec:
+        rec.record_message("user", "Hello")
+        rec.record_llm_response(model="test", content="Hi")
+
+    assert rec.trace.success is True
+    assert rec.trace.end_time is not None
+
+
+def test_recorder_tool_result_correlation():
+    """record_tool_result should backfill tool call results by ID."""
+    rec = Recorder(task="Correlation test")
+    rec.record_tool_call(name="search", arguments={"q": "test"}, result=None)
+    rec._pending_tool_calls["tc_123"] = 0
+
+    rec.record_tool_result("tc_123", "search results here")
+    assert rec.trace.tool_calls[0].result == "search results here"
+    assert "tc_123" not in rec._pending_tool_calls
+
+
 def test_replayer_reset():
     rec = Recorder(task="Reset test")
     rec.record_llm_response(model="test", content="Hello")

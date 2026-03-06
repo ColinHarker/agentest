@@ -181,9 +181,8 @@ TOOL CALLS:
 
 RESULT: {"Success" if trace.success else "Failed"}{f" - {trace.error}" if trace.error else ""}
 
-Respond with exactly two lines:
-SCORE: <number between 0.0 and 1.0>
-REASONING: <one sentence explanation>"""
+Respond with ONLY a JSON object (no other text):
+{{"score": <number between 0.0 and 1.0>, "reasoning": "<one sentence explanation>"}}"""
 
     def _call_llm(self, prompt: str) -> str:
         """Send the prompt to the configured LLM and return the response text."""
@@ -193,15 +192,18 @@ REASONING: <one sentence explanation>"""
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=200,
+                temperature=0,
                 messages=[{"role": "user", "content": prompt}],
             )
             result: str = response.content[0].text
             return result
         elif hasattr(self.client, "chat"):
-            # OpenAI
+            # OpenAI — use JSON response format for structured output
             response = self.client.chat.completions.create(
                 model=self.model,
                 max_tokens=200,
+                temperature=0,
+                response_format={"type": "json_object"},
                 messages=[{"role": "user", "content": prompt}],
             )
             return response.choices[0].message.content or ""
@@ -210,7 +212,26 @@ REASONING: <one sentence explanation>"""
 
     @staticmethod
     def _parse_response(response: str) -> tuple[float, str]:
-        """Parse SCORE and REASONING lines from the LLM response."""
+        """Parse score and reasoning from the LLM response.
+
+        Tries JSON first, falls back to line-based parsing for backward compat.
+        """
+        import json as _json
+
+        # Try JSON first
+        text = response.strip()
+        try:
+            # Strip markdown code fences if present
+            if text.startswith("```"):
+                text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+            data = _json.loads(text)
+            score = max(0.0, min(1.0, float(data.get("score", 0.5))))
+            reasoning = str(data.get("reasoning", ""))
+            return score, reasoning
+        except (_json.JSONDecodeError, ValueError, KeyError, TypeError):
+            pass
+
+        # Fall back to line-based parsing
         score = 0.5
         reasoning = response.strip()
 
@@ -225,3 +246,136 @@ REASONING: <one sentence explanation>"""
                 reasoning = line.split(":", 1)[1].strip()
 
         return score, reasoning
+
+
+class RubricEvaluator(Evaluator):
+    """Evaluator that scores an agent trace against a weighted rubric.
+
+    Each criterion in the rubric is scored independently by an LLM, then
+    a weighted average produces the final score.
+    """
+
+    name = "rubric"
+
+    def __init__(
+        self,
+        rubric: dict[str, float],
+        model: str = "claude-sonnet-4-6",
+        client: Any = None,
+    ) -> None:
+        """Initialize the rubric evaluator.
+
+        Args:
+            rubric: Mapping of criterion descriptions to their weights.
+                    Weights are normalized so they sum to 1.0.
+            model: Model identifier for the LLM.
+            client: Anthropic or OpenAI client instance.
+        """
+        total = sum(rubric.values())
+        if total > 0:
+            self.rubric = {k: v / total for k, v in rubric.items()}
+        else:
+            self.rubric = {k: 1.0 / len(rubric) for k in rubric} if rubric else {}
+        self.model = model
+        self.client = client
+
+    def evaluate(self, trace: AgentTrace) -> EvalResult:
+        """Score the trace against every criterion and return a weighted result."""
+        if self.client is None:
+            return EvalResult(
+                evaluator=self.name,
+                score=0.0,
+                passed=False,
+                message="No LLM client configured. Install anthropic or openai.",
+            )
+
+        criterion_scores: list[dict[str, Any]] = []
+        weighted_total = 0.0
+
+        for criterion, weight in self.rubric.items():
+            score, reasoning = self._score_criterion(trace, criterion)
+            criterion_scores.append(
+                {
+                    "criterion": criterion,
+                    "weight": weight,
+                    "score": score,
+                    "reasoning": reasoning,
+                }
+            )
+            weighted_total += score * weight
+
+        final_score = max(0.0, min(1.0, weighted_total))
+        passed = final_score >= 0.7
+
+        return EvalResult(
+            evaluator=self.name,
+            score=final_score,
+            passed=passed,
+            details={"criterion_scores": criterion_scores},
+            message=f"Rubric score: {final_score:.2f} ({len(criterion_scores)} criteria)",
+        )
+
+    def _score_criterion(self, trace: AgentTrace, criterion: str) -> tuple[float, str]:
+        """Ask the LLM to score a single criterion and return (score, reasoning)."""
+        import json as _json
+
+        tool_summary = "\n".join(
+            f"  - {tc.name}({tc.arguments}) -> {tc.result}" for tc in trace.tool_calls[:20]
+        )
+        messages_summary = "\n".join(
+            f"  [{m.role.value}]: {m.content[:200]}" for m in trace.messages[:20]
+        )
+
+        prompt = f"""You are evaluating an AI agent's performance on a specific criterion.
+Score from 0.0 to 1.0.
+
+TASK: {trace.task}
+
+CRITERION: {criterion}
+
+AGENT MESSAGES:
+{messages_summary}
+
+TOOL CALLS:
+{tool_summary}
+
+RESULT: {"Success" if trace.success else "Failed"}{f" - {trace.error}" if trace.error else ""}
+
+Respond with ONLY a JSON object (no other text):
+{{"score": <number between 0.0 and 1.0>, "reasoning": "<one sentence explanation>"}}"""
+
+        try:
+            if hasattr(self.client, "messages"):
+                # Anthropic
+                response = self.client.messages.create(
+                    model=self.model,
+                    max_tokens=200,
+                    temperature=0,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                text: str = response.content[0].text
+            elif hasattr(self.client, "chat"):
+                # OpenAI
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    max_tokens=200,
+                    temperature=0,
+                    response_format={"type": "json_object"},
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                text = response.choices[0].message.content or ""
+            else:
+                raise TypeError(f"Unsupported client type: {type(self.client)}")
+
+            # Parse JSON response
+            raw = text.strip()
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+            data = _json.loads(raw)
+            score = max(0.0, min(1.0, float(data.get("score", 0.5))))
+            reasoning = str(data.get("reasoning", ""))
+            return score, reasoning
+        except (_json.JSONDecodeError, ValueError, KeyError, TypeError):
+            return 0.5, "Failed to parse LLM response"
+        except Exception as e:
+            return 0.5, f"Error scoring criterion: {e}"

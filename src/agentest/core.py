@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 import uuid
+from collections import Counter
 from enum import Enum
 from typing import Any
 
@@ -115,10 +116,18 @@ class LLMResponse(BaseModel):
         then falls back to built-in defaults. Returns 0.0 for unknown models.
         """
         pricing = get_model_pricing()
+        # Exact match first
+        if self.model in pricing:
+            input_price, output_price = pricing[self.model]
+            return (
+                self.input_tokens * input_price / 1_000_000
+                + self.output_tokens * output_price / 1_000_000
+            )
+        # Prefix fallback (longest first to avoid ambiguous matches)
         for model_prefix, (input_price, output_price) in sorted(
             pricing.items(), key=lambda x: len(x[0]), reverse=True
         ):
-            if model_prefix in self.model:
+            if self.model.startswith(model_prefix):
                 return (
                     self.input_tokens * input_price / 1_000_000
                     + self.output_tokens * output_price / 1_000_000
@@ -262,8 +271,10 @@ def diff_traces(trace_a: AgentTrace, trace_b: AgentTrace) -> dict[str, Any]:
     tool_names_a = [tc.name for tc in trace_a.tool_calls]
     tool_names_b = [tc.name for tc in trace_b.tool_calls]
 
-    added_tools = [name for name in tool_names_b if name not in set(tool_names_a)]
-    removed_tools = [name for name in tool_names_a if name not in set(tool_names_b)]
+    tool_counts_a = Counter(tool_names_a)
+    tool_counts_b = Counter(tool_names_b)
+    added_tools = list((tool_counts_b - tool_counts_a).elements())
+    removed_tools = list((tool_counts_a - tool_counts_b).elements())
 
     # Models used
     models_a = sorted({r.model for r in trace_a.llm_responses})

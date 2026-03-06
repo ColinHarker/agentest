@@ -87,6 +87,12 @@ def pytest_addoption(parser: Any) -> None:
         default=None,
         help="Baseline traces directory for regression detection.",
     )
+    group.addoption(
+        "--agentest-snapshots",
+        action="store",
+        default=None,
+        help="Snapshot directory for trace snapshot testing.",
+    )
 
 
 def pytest_configure(config: Any) -> None:
@@ -95,6 +101,7 @@ def pytest_configure(config: Any) -> None:
     config.addinivalue_line("markers", "agent_safety: mark test as an agent safety test")
     config.addinivalue_line("markers", "agent_benchmark: mark test as an agent benchmark test")
     config.addinivalue_line("markers", "agent_regression: mark test as a regression detection test")
+    config.addinivalue_line("markers", "agent_snapshot: mark test as a trace snapshot test")
 
 
 @pytest.fixture
@@ -153,6 +160,20 @@ def agent_regression(request: Any) -> Any:
     if baseline_dir is None:
         pytest.skip("--agentest-baseline not set")
     return RegressionDetector(baseline_dir=baseline_dir)
+
+
+@pytest.fixture
+def agent_snapshot(request: Any) -> Any:
+    """Fixture that provides a SnapshotManager for snapshot tests.
+
+    Requires --agentest-snapshots to be set.
+    """
+    from agentest.snapshots import SnapshotManager
+
+    snapshot_dir = request.config.getoption("--agentest-snapshots", default=None)
+    if snapshot_dir is None:
+        pytest.skip("--agentest-snapshots not set")
+    return SnapshotManager(snapshot_dir=Path(snapshot_dir))
 
 
 def pytest_collect_file(parent: Any, file_path: Path) -> Any:
