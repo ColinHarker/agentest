@@ -1,0 +1,83 @@
+{
+  "id": "sample-trace-002",
+  "task": "Find all Python files that import pandas",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Find all Python files that import pandas",
+      "tool_calls": [],
+      "timestamp": 1709601000.0
+    },
+    {
+      "role": "assistant",
+      "content": "I found 3 Python files that import pandas: src/loader.py, src/transform.py, and tests/test_loader.py.",
+      "tool_calls": [],
+      "timestamp": 1709601005.0
+    }
+  ],
+  "llm_responses": [
+    {
+      "id": "resp-002a",
+      "model": "claude-sonnet-4-6",
+      "role": "assistant",
+      "content": "I'll search for Python files that import pandas using the search tool.",
+      "tool_calls": [],
+      "input_tokens": 180,
+      "output_tokens": 25,
+      "total_tokens": 205,
+      "latency_ms": 820.0,
+      "timestamp": 1709601001.0,
+      "raw": {}
+    },
+    {
+      "id": "resp-002b",
+      "model": "claude-sonnet-4-6",
+      "role": "assistant",
+      "content": "I found 3 Python files that import pandas: src/loader.py, src/transform.py, and tests/test_loader.py.",
+      "tool_calls": [],
+      "input_tokens": 950,
+      "output_tokens": 38,
+      "total_tokens": 988,
+      "latency_ms": 1100.0,
+      "timestamp": 1709601005.0,
+      "raw": {}
+    }
+  ],
+  "tool_calls": [
+    {
+      "id": "tc-002a",
+      "name": "search",
+      "arguments": {"query": "import pandas", "file_pattern": "*.py"},
+      "result": ["src/loader.py:1", "src/transform.py:3", "tests/test_loader.py:2"],
+      "error": null,
+      "duration_ms": 250.0,
+      "timestamp": 1709601002.0
+    },
+    {
+      "id": "tc-002b",
+      "name": "read_file",
+      "arguments": {"path": "src/loader.py"},
+      "result": "import pandas as pd\n\ndef load_csv(path):\n    return pd.read_csv(path)",
+      "error": null,
+      "duration_ms": 8.0,
+      "timestamp": 1709601003.0
+    },
+    {
+      "id": "tc-002c",
+      "name": "read_file",
+      "arguments": {"path": "src/transform.py"},
+      "result": "import numpy as np\nimport json\nimport pandas as pd\n\ndef normalize(df):\n    return df.apply(lambda x: (x - x.mean()) / x.std())",
+      "error": null,
+      "duration_ms": 9.5,
+      "timestamp": 1709601003.5
+    }
+  ],
+  "metadata": {
+    "framework": "manual",
+    "environment": "development"
+  },
+  "start_time": 1709601000.0,
+  "end_time": 1709601005.5,
+  "success": true,
+  "error": null
+}

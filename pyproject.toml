@@ -1,0 +1,90 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentest"
+version = "0.2.0"
+description = "Universal agent testing and evaluation toolkit - record, replay, mock, and benchmark AI agents"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Agentest Contributors" },
+]
+keywords = ["ai", "agents", "testing", "evaluation", "llm", "mcp", "benchmark"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "click>=8.0",
+    "pydantic>=2.0",
+    "rich>=13.0",
+    "pyyaml>=6.0",
+    "httpx>=0.25.0",
+    "jinja2>=3.1",
+]
+
+[project.optional-dependencies]
+web = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+]
+anthropic = ["anthropic>=0.40.0"]
+openai = ["openai>=1.50.0"]
+langchain = ["langchain-core>=0.3.0"]
+crewai = ["crewai>=0.80.0"]
+autogen = ["autogen-agentchat>=0.4.0"]
+llamaindex = ["llama-index-core>=0.11.0"]
+all = [
+    "agentest[web,anthropic,openai,langchain,crewai,autogen,llamaindex]",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+]
+docs = []  # Docs now use Docusaurus (Node.js) — run `npm install && npm run build`
+
+[project.scripts]
+agentest = "agentest.cli:main"
+
+[project.entry-points."pytest11"]
+agentest = "agentest.pytest_plugin"
+
+[project.urls]
+Homepage = "https://github.com/ColinHarker/agentest"
+Repository = "https://github.com/ColinHarker/agentest"
+Issues = "https://github.com/ColinHarker/agentest/issues"
+Documentation = "https://ColinHarker.github.io/agentest/"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentest"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

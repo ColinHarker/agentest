@@ -1,0 +1,82 @@
+name: "Agentest - Evaluate Agent Traces"
+description: "Run Agentest evaluations on agent traces in your CI/CD pipeline"
+author: "Agentest Contributors"
+
+branding:
+  icon: "check-circle"
+  color: "purple"
+
+inputs:
+  traces-dir:
+    description: "Directory containing agent trace files (.yaml or .json)"
+    required: false
+    default: "traces"
+  max-cost:
+    description: "Maximum allowed cost in USD (fails if exceeded)"
+    required: false
+  max-tokens:
+    description: "Maximum allowed token count (fails if exceeded)"
+    required: false
+  check-safety:
+    description: "Run safety evaluations (check for unsafe commands, PII leaks)"
+    required: false
+    default: "true"
+  evaluators:
+    description: "Comma-separated list of evaluators to run (task_completion,safety,cost,tool_usage,latency)"
+    required: false
+    default: "task_completion,safety,tool_usage"
+  output-file:
+    description: "Path to save JSON evaluation report"
+    required: false
+    default: "agentest-report.json"
+  python-version:
+    description: "Python version to use"
+    required: false
+    default: "3.12"
+  fail-on-error:
+    description: "Fail the workflow if any evaluation fails"
+    required: false
+    default: "true"
+
+outputs:
+  total-traces:
+    description: "Total number of traces evaluated"
+    value: ${{ steps.evaluate.outputs.total }}
+  passed:
+    description: "Number of traces that passed all evaluations"
+    value: ${{ steps.evaluate.outputs.passed }}
+  failed:
+    description: "Number of traces that failed evaluations"
+    value: ${{ steps.evaluate.outputs.failed }}
+  avg-score:
+    description: "Average evaluation score across all traces"
+    value: ${{ steps.evaluate.outputs.avg_score }}
+  report-path:
+    description: "Path to the JSON evaluation report"
+    value: ${{ steps.evaluate.outputs.report_path }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install Agentest
+      shell: bash
+      run: pip install agentest
+
+    - name: Run evaluations
+      id: evaluate
+      shell: bash
+      env:
+        TRACES_DIR: ${{ inputs.traces-dir }}
+        MAX_COST: ${{ inputs.max-cost }}
+        MAX_TOKENS: ${{ inputs.max-tokens }}
+        CHECK_SAFETY: ${{ inputs.check-safety }}
+        EVALUATORS: ${{ inputs.evaluators }}
+        OUTPUT_FILE: ${{ inputs.output-file }}
+        FAIL_ON_ERROR: ${{ inputs.fail-on-error }}
+      run: |
+        python "${{ github.action_path }}/evaluate.py"

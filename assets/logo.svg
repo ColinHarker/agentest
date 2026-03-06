@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 120" fill="none">
+  <defs>
+    <linearGradient id="shield" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="check" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Shield shape -->
+  <path d="M20 25 L55 10 L90 25 L90 65 Q90 90 55 105 Q20 90 20 65 Z"
+        fill="url(#shield)" opacity="0.9"/>
+
+  <!-- Checkmark inside shield -->
+  <path d="M38 58 L50 70 L72 42" stroke="url(#check)" stroke-width="7"
+        stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- Pulse rings (eval/test metaphor) -->
+  <circle cx="55" cy="57" r="35" stroke="#6366f1" stroke-width="1.5" fill="none" opacity="0.3"/>
+  <circle cx="55" cy="57" r="45" stroke="#6366f1" stroke-width="1" fill="none" opacity="0.15"/>
+
+  <!-- Text: Agentest -->
+  <text x="115" y="55" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif"
+        font-size="42" font-weight="700" fill="#1e1b4b" letter-spacing="-1">
+    Agent<tspan fill="#6366f1">est</tspan>
+  </text>
+
+  <!-- Tagline -->
+  <text x="117" y="80" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif"
+        font-size="14" fill="#6b7280" letter-spacing="0.5">
+    Universal AI Agent Testing Toolkit
+  </text>
+</svg>

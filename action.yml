@@ -1,0 +1,238 @@
+name: "Agentest Evaluation"
+description: "Run Agentest evaluations on agent traces in CI/CD pipelines"
+author: "Agentest Contributors"
+
+branding:
+  icon: "check-circle"
+  color: "purple"
+
+inputs:
+  traces-dir:
+    description: "Directory containing trace files (.yaml, .json)"
+    required: false
+    default: "traces"
+  evaluators:
+    description: "Comma-separated list of evaluators to run"
+    required: false
+    default: "task_completion,safety,tool_usage"
+  max-cost:
+    description: "Maximum allowed cost in USD"
+    required: false
+  max-tokens:
+    description: "Maximum allowed total tokens"
+    required: false
+  check-safety:
+    description: "Run safety evaluations"
+    required: false
+    default: "true"
+  output-file:
+    description: "Path to save JSON report"
+    required: false
+    default: "agentest-report.json"
+  fail-on-error:
+    description: "Fail the workflow step if any evaluation fails"
+    required: false
+    default: "true"
+  python-version:
+    description: "Python version to use"
+    required: false
+    default: "3.12"
+  agentest-version:
+    description: "Agentest version to install (e.g., '0.2.0' or 'latest')"
+    required: false
+    default: "latest"
+
+outputs:
+  total-traces:
+    description: "Number of traces evaluated"
+    value: ${{ steps.evaluate.outputs.total_traces }}
+  passed:
+    description: "Number of traces that passed"
+    value: ${{ steps.evaluate.outputs.passed }}
+  failed:
+    description: "Number of traces that failed"
+    value: ${{ steps.evaluate.outputs.failed }}
+  avg-score:
+    description: "Average score across all traces"
+    value: ${{ steps.evaluate.outputs.avg_score }}
+  report-path:
+    description: "Path to the JSON report file"
+    value: ${{ steps.evaluate.outputs.report_path }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install Agentest
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        if [ "${{ inputs.agentest-version }}" = "latest" ]; then
+          pip install agentest
+        else
+          pip install "agentest==${{ inputs.agentest-version }}"
+        fi
+
+    - name: Run evaluations
+      id: evaluate
+      shell: bash
+      run: |
+        python -c "
+        import json, sys, os
+        from pathlib import Path
+
+        from agentest import Recorder
+        from agentest.evaluators.builtin import (
+            TaskCompletionEvaluator,
+            SafetyEvaluator,
+            CostEvaluator,
+            LatencyEvaluator,
+            ToolUsageEvaluator,
+        )
+
+        traces_dir = Path('${{ inputs.traces-dir }}')
+        evaluator_names = '${{ inputs.evaluators }}'.split(',')
+        max_cost = float('${{ inputs.max-cost }}') if '${{ inputs.max-cost }}' else None
+        max_tokens = int('${{ inputs.max-tokens }}') if '${{ inputs.max-tokens }}' else None
+        check_safety = '${{ inputs.check-safety }}' == 'true'
+        output_file = '${{ inputs.output-file }}'
+        fail_on_error = '${{ inputs.fail-on-error }}' == 'true'
+
+        # Build evaluator list
+        evaluator_map = {
+            'task_completion': TaskCompletionEvaluator(),
+            'safety': SafetyEvaluator(),
+            'cost': CostEvaluator(max_cost=max_cost, max_tokens=max_tokens),
+            'latency': LatencyEvaluator(),
+            'tool_usage': ToolUsageEvaluator(),
+        }
+        evaluators = [evaluator_map[name.strip()] for name in evaluator_names if name.strip() in evaluator_map]
+
+        if check_safety and 'safety' not in evaluator_names:
+            evaluators.append(SafetyEvaluator())
+
+        # Discover trace files
+        if not traces_dir.exists():
+            print(f'::warning::Traces directory not found: {traces_dir}')
+            # Write empty outputs
+            with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                f.write('total_traces=0\n')
+                f.write('passed=0\n')
+                f.write('failed=0\n')
+                f.write('avg_score=0\n')
+                f.write(f'report_path={output_file}\n')
+            Path(output_file).write_text(json.dumps({'traces': [], 'summary': {}}))
+            sys.exit(0)
+
+        trace_files = sorted(
+            f for f in traces_dir.iterdir()
+            if f.suffix in ('.yaml', '.yml', '.json')
+        )
+
+        if not trace_files:
+            print(f'::warning::No trace files found in {traces_dir}')
+            with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                f.write('total_traces=0\n')
+                f.write('passed=0\n')
+                f.write('failed=0\n')
+                f.write('avg_score=0\n')
+                f.write(f'report_path={output_file}\n')
+            Path(output_file).write_text(json.dumps({'traces': [], 'summary': {}}))
+            sys.exit(0)
+
+        # Evaluate each trace
+        results = []
+        total_passed = 0
+        total_failed = 0
+        all_scores = []
+
+        for trace_file in trace_files:
+            try:
+                trace = Recorder.load(trace_file)
+            except Exception as e:
+                print(f'::error::Failed to load {trace_file}: {e}')
+                total_failed += 1
+                results.append({
+                    'file': str(trace_file),
+                    'error': str(e),
+                    'passed': False,
+                })
+                continue
+
+            eval_results = [ev.evaluate(trace) for ev in evaluators]
+            all_passed = all(r.passed for r in eval_results)
+            avg_score = sum(r.score for r in eval_results) / len(eval_results) if eval_results else 0
+
+            if all_passed:
+                total_passed += 1
+            else:
+                total_failed += 1
+
+            all_scores.append(avg_score)
+
+            trace_result = {
+                'file': str(trace_file),
+                'trace_id': trace.id,
+                'task': trace.task,
+                'passed': all_passed,
+                'avg_score': avg_score,
+                'evaluations': [
+                    {
+                        'evaluator': r.evaluator,
+                        'passed': r.passed,
+                        'score': r.score,
+                        'message': r.message,
+                    }
+                    for r in eval_results
+                ],
+            }
+            results.append(trace_result)
+
+            # Print per-trace summary
+            status = '✅' if all_passed else '❌'
+            print(f'{status} {trace_file.name}: score={avg_score:.2f} ({\"PASS\" if all_passed else \"FAIL\"})')
+            for r in eval_results:
+                icon = '  ✓' if r.passed else '  ✗'
+                print(f'{icon} {r.evaluator}: {r.score:.2f} - {r.message}')
+
+        # Summary
+        total = len(trace_files)
+        overall_avg = sum(all_scores) / len(all_scores) if all_scores else 0
+
+        print()
+        print(f'--- Agentest Evaluation Summary ---')
+        print(f'Total traces: {total}')
+        print(f'Passed: {total_passed}')
+        print(f'Failed: {total_failed}')
+        print(f'Average score: {overall_avg:.3f}')
+
+        # Write report
+        report = {
+            'summary': {
+                'total_traces': total,
+                'passed': total_passed,
+                'failed': total_failed,
+                'avg_score': overall_avg,
+            },
+            'traces': results,
+        }
+        Path(output_file).parent.mkdir(parents=True, exist_ok=True)
+        Path(output_file).write_text(json.dumps(report, indent=2))
+
+        # Set outputs
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+            f.write(f'total_traces={total}\n')
+            f.write(f'passed={total_passed}\n')
+            f.write(f'failed={total_failed}\n')
+            f.write(f'avg_score={overall_avg:.3f}\n')
+            f.write(f'report_path={output_file}\n')
+
+        # Fail if requested
+        if fail_on_error and total_failed > 0:
+            print(f'::error::{total_failed} trace(s) failed evaluation')
+            sys.exit(1)
+        "

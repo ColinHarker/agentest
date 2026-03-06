@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agentest</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-primary: #0f1117;
+      --bg-secondary: #161822;
+      --bg-tertiary: #1e2030;
+      --bg-hover: #262940;
+      --border: #2e3148;
+      --border-light: #3d4167;
+      --text-primary: #e2e4f0;
+      --text-secondary: #9399b2;
+      --text-muted: #6b7089;
+      --accent: #818cf8;
+      --accent-dim: #6366f1;
+      --accent-bg: rgba(129,140,248,0.1);
+      --green: #34d399;
+      --green-bg: rgba(52,211,153,0.1);
+      --red: #f87171;
+      --red-bg: rgba(248,113,113,0.1);
+      --yellow: #fbbf24;
+      --yellow-bg: rgba(251,191,36,0.1);
+      --blue: #60a5fa;
+      --blue-bg: rgba(96,165,250,0.1);
+      --radius: 8px;
+      --radius-sm: 4px;
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      --mono: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', Menlo, monospace;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-logo {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .header-logo svg { width: 20px; height: 20px; }
+    .header-nav { display: flex; gap: 4px; }
+    .header-nav button {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-family: var(--font);
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .header-nav button:hover { color: var(--text-primary); background: var(--bg-hover); }
+    .header-nav button.active { color: var(--accent); background: var(--accent-bg); }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+    .header-right .refresh-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-family: var(--font);
+      padding: 5px 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .header-right .refresh-btn:hover { color: var(--text-primary); border-color: var(--border-light); }
+    .refresh-btn svg { width: 14px; height: 14px; }
+
+    /* Main content */
+    .main { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+    /* Stats cards */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+    .stat-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .stat-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* Section */
+    .section {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 24px;
+    }
+    .section-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .section-body { padding: 0; }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th {
+      text-align: left;
+      padding: 10px 16px;
+      font-weight: 500;
+      color: var(--text-muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody td {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr { cursor: pointer; transition: background 0.1s; }
+    tbody tr:hover { background: var(--bg-hover); }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-success { background: var(--green-bg); color: var(--green); }
+    .badge-fail { background: var(--red-bg); color: var(--red); }
+    .badge-pending { background: var(--yellow-bg); color: var(--yellow); }
+    .badge-info { background: var(--blue-bg); color: var(--blue); }
+    .badge-accent { background: var(--accent-bg); color: var(--accent); }
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .badge-success .badge-dot { background: var(--green); }
+    .badge-fail .badge-dot { background: var(--red); }
+    .badge-pending .badge-dot { background: var(--yellow); }
+
+    /* Mono text */
+    .mono { font-family: var(--mono); font-size: 12px; }
+    .text-muted { color: var(--text-muted); }
+    .text-secondary { color: var(--text-secondary); }
+    .text-accent { color: var(--accent); }
+    .text-green { color: var(--green); }
+    .text-red { color: var(--red); }
+    .text-right { text-align: right; }
+
+    /* Truncate */
+    .truncate {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 350px;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      font-family: var(--font);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-primary {
+      background: var(--accent-dim);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--accent); }
+    .btn-danger {
+      background: none;
+      border-color: var(--border);
+      color: var(--red);
+    }
+    .btn-danger:hover { background: var(--red-bg); border-color: #f87171; }
+    .btn-ghost {
+      background: none;
+      border-color: var(--border);
+      color: var(--text-secondary);
+    }
+    .btn-ghost:hover { color: var(--text-primary); border-color: var(--border-light); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Breadcrumb */
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+      font-size: 13px;
+    }
+    .breadcrumb a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .breadcrumb a:hover { color: var(--accent); }
+    .breadcrumb .sep { color: var(--text-muted); }
+    .breadcrumb .current { color: var(--text-primary); }
+
+    /* Detail grid */
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      padding: 20px;
+    }
+    .meta-item {}
+    .meta-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .meta-value {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    /* Messages & items list */
+    .item-list { padding: 0; }
+    .item-entry {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .item-entry:last-child { border-bottom: none; }
+    .item-entry-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .item-entry-body {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .item-entry-body.collapsed {
+      max-height: 80px;
+      overflow: hidden;
+      position: relative;
+    }
+    .item-entry-body.collapsed::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 30px;
+      background: linear-gradient(transparent, var(--bg-secondary));
+    }
+    .expand-btn {
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-size: 12px;
+      font-family: var(--font);
+      cursor: pointer;
+      padding: 4px 0;
+    }
+    .expand-btn:hover { text-decoration: underline; }
+    .role-badge {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 2px 8px;
+      border-radius: var(--radius-sm);
+    }
+    .role-user { background: var(--blue-bg); color: var(--blue); }
+    .role-assistant { background: var(--accent-bg); color: var(--accent); }
+    .role-system { background: var(--yellow-bg); color: var(--yellow); }
+    .role-tool { background: var(--green-bg); color: var(--green); }
+
+    /* Tool call item */
+    .tool-call-args {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+      max-height: 120px;
+      overflow: auto;
+      margin-top: 8px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* Eval results */
+    .eval-results { padding: 16px 20px; }
+    .eval-result-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .eval-result-item:last-child { border-bottom: none; }
+    .eval-name {
+      font-size: 13px;
+      font-weight: 500;
+      min-width: 140px;
+    }
+    .eval-score-bar {
+      flex: 1;
+      height: 6px;
+      background: var(--bg-tertiary);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .eval-score-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+    .eval-score-value {
+      font-size: 13px;
+      font-weight: 600;
+      font-family: var(--mono);
+      min-width: 48px;
+      text-align: right;
+    }
+    .eval-message {
+      font-size: 12px;
+      color: var(--text-muted);
+      min-width: 200px;
+    }
+
+    /* Loading & empty states */
+    .loading-state, .empty-state, .error-state {
+      padding: 48px 24px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    .error-state { color: var(--red); }
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-family: var(--font);
+      font-weight: 500;
+      padding: 10px 16px;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-bottom: -1px;
+    }
+    .tab-btn:hover { color: var(--text-primary); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-count {
+      font-size: 11px;
+      background: var(--bg-tertiary);
+      padding: 1px 6px;
+      border-radius: 8px;
+      margin-left: 6px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .main { padding: 16px; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .stat-value { font-size: 22px; }
+      .meta-grid { grid-template-columns: repeat(2, 1fr); }
+      .truncate { max-width: 180px; }
+      .header { padding: 0 16px; }
+      .eval-message { display: none; }
+    }
+
+    /* Fade in animation */
+    .fade-in { animation: fadeIn 0.2s ease-out; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Chart container */
+    .chart-container {
+      padding: 20px;
+      height: 220px;
+      position: relative;
+    }
+
+    .hidden { display: none !important; }
+
+    /* Summary bar for eval */
+    .eval-summary {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-tertiary);
+    }
+    .eval-summary-score {
+      font-size: 24px;
+      font-weight: 700;
+      font-family: var(--mono);
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 20V10"/>
+        <path d="M18 20V4"/>
+        <path d="M6 20v-4"/>
+      </svg>
+      Agentest
+    </div>
+    <nav class="header-nav">
+      <button id="nav-dashboard" class="active" onclick="navigate('dashboard')">Dashboard</button>
+      <button id="nav-traces" onclick="navigate('traces')">Traces</button>
+    </nav>
+    <div class="header-right">
+      <button class="refresh-btn" onclick="refreshCurrentView()" title="Refresh">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"/>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+        </svg>
+        Refresh
+      </button>
+    </div>
+  </header>
+
+  <div class="main">
+    <!-- Dashboard View -->
+    <div id="view-dashboard" class="fade-in">
+      <div id="dashboard-loading" class="loading-state"><div class="spinner"></div>Loading dashboard...</div>
+      <div id="dashboard-error" class="error-state hidden"></div>
+      <div id="dashboard-content" class="hidden">
+        <div class="stats-grid" id="stats-grid"></div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;" id="charts-row">
+          <div class="section">
+            <div class="section-header"><span class="section-title">Tool Usage</span></div>
+            <div class="chart-container"><canvas id="chart-tools"></canvas></div>
+          </div>
+          <div class="section">
+            <div class="section-header"><span class="section-title">Cost by Model</span></div>
+            <div class="chart-container"><canvas id="chart-cost"></canvas></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-header">
+            <span class="section-title">Recent Traces</span>
+            <button class="btn btn-ghost" onclick="navigate('traces')" style="font-size:12px;">View all</button>
+          </div>
+          <div class="section-body">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Status</th>
+                    <th>Task</th>
+                    <th>Cost</th>
+                    <th>Tokens</th>
+                    <th>Duration</th>
+                    <th>Time</th>
+                  </tr>
+                </thead>
+                <tbody id="recent-traces-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Traces List View -->
+    <div id="view-traces" class="hidden fade-in">
+      <div id="traces-loading" class="loading-state"><div class="spinner"></div>Loading traces...</div>
+      <div id="traces-error" class="error-state hidden"></div>
+      <div id="traces-content" class="hidden">
+        <div class="section">
+          <div class="section-header">
+            <span class="section-title">All Traces <span id="traces-count" class="tab-count">0</span></span>
+          </div>
+          <div class="section-body">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Status</th>
+                    <th>Task</th>
+                    <th>Cost</th>
+                    <th>Tokens</th>
+                    <th>LLM Calls</th>
+                    <th>Tool Calls</th>
+                    <th>Models</th>
+                    <th>Duration</th>
+                  </tr>
+                </thead>
+                <tbody id="traces-table-body"></tbody>
+              </table>
+            </div>
+            <div id="traces-empty" class="empty-state hidden">No traces found. Run some agent tasks and they will appear here.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Trace Detail View -->
+    <div id="view-detail" class="hidden fade-in">
+      <div id="detail-loading" class="loading-state"><div class="spinner"></div>Loading trace...</div>
+      <div id="detail-error" class="error-state hidden"></div>
+      <div id="detail-content" class="hidden">
+        <div class="breadcrumb">
+          <a onclick="navigate('traces')">Traces</a>
+          <span class="sep">/</span>
+          <span class="current" id="detail-breadcrumb-id"></span>
+        </div>
+
+        <!-- Meta -->
+        <div class="section" style="margin-bottom:16px;">
+          <div class="section-header">
+            <span class="section-title" id="detail-task-title"></span>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-primary" id="eval-btn" onclick="runEvaluation()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                Evaluate
+              </button>
+              <button class="btn btn-danger" id="delete-btn" onclick="deleteTrace()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                Delete
+              </button>
+            </div>
+          </div>
+          <div class="meta-grid" id="detail-meta"></div>
+        </div>
+
+        <!-- Eval results (shown after eval) -->
+        <div class="section hidden" id="eval-section" style="margin-bottom:16px;">
+          <div class="section-header"><span class="section-title">Evaluation Results</span></div>
+          <div id="eval-summary-bar" class="eval-summary"></div>
+          <div class="eval-results" id="eval-results"></div>
+        </div>
+
+        <!-- Tabs for messages / tool calls / llm responses -->
+        <div class="section">
+          <div class="tabs">
+            <button class="tab-btn active" data-tab="messages" onclick="switchTab(this)">Messages <span class="tab-count" id="tab-count-messages">0</span></button>
+            <button class="tab-btn" data-tab="tools" onclick="switchTab(this)">Tool Calls <span class="tab-count" id="tab-count-tools">0</span></button>
+            <button class="tab-btn" data-tab="llm" onclick="switchTab(this)">LLM Responses <span class="tab-count" id="tab-count-llm">0</span></button>
+          </div>
+          <div class="section-body">
+            <div id="tab-messages" class="item-list"></div>
+            <div id="tab-tools" class="item-list hidden"></div>
+            <div id="tab-llm" class="item-list hidden"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart.js from CDN (lightweight) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script>
+    // ---- State ----
+    let currentView = 'dashboard';
+    let currentTraceId = null;
+    let currentTraceData = null;
+    let chartInstances = {};
+
+    // ---- API helpers ----
+    async function api(path, options = {}) {
+      try {
+        const resp = await fetch(path, options);
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+          throw new Error(err.detail || `HTTP ${resp.status}`);
+        }
+        return await resp.json();
+      } catch (e) {
+        throw e;
+      }
+    }
+
+    // ---- Formatting ----
+    function fmtCost(v) {
+      if (v == null) return '--';
+      return '$' + v.toFixed(4);
+    }
+    function fmtTokens(v) {
+      if (v == null) return '--';
+      if (v >= 1000000) return (v / 1000000).toFixed(1) + 'M';
+      if (v >= 1000) return (v / 1000).toFixed(1) + 'k';
+      return v.toLocaleString();
+    }
+    function fmtDuration(ms) {
+      if (ms == null) return '--';
+      if (ms < 1000) return Math.round(ms) + 'ms';
+      if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+      return (ms / 60000).toFixed(1) + 'm';
+    }
+    function fmtPercent(v) {
+      return (v * 100).toFixed(1) + '%';
+    }
+    function fmtTime(ts) {
+      if (!ts) return '--';
+      const d = new Date(ts * 1000);
+      const now = new Date();
+      const diff = (now - d) / 1000;
+      if (diff < 60) return 'just now';
+      if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+      if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+      return d.toLocaleDateString();
+    }
+    function escapeHtml(s) {
+      if (!s) return '';
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function successBadge(val) {
+      if (val === true) return '<span class="badge badge-success"><span class="badge-dot"></span>Pass</span>';
+      if (val === false) return '<span class="badge badge-fail"><span class="badge-dot"></span>Fail</span>';
+      return '<span class="badge badge-pending"><span class="badge-dot"></span>N/A</span>';
+    }
+
+    // ---- Navigation ----
+    function navigate(view, traceId) {
+      // Hide all views
+      document.getElementById('view-dashboard').classList.add('hidden');
+      document.getElementById('view-traces').classList.add('hidden');
+      document.getElementById('view-detail').classList.add('hidden');
+
+      // Update nav
+      document.querySelectorAll('.header-nav button').forEach(b => b.classList.remove('active'));
+
+      currentView = view;
+      if (view === 'dashboard') {
+        document.getElementById('nav-dashboard').classList.add('active');
+        document.getElementById('view-dashboard').classList.remove('hidden');
+        loadDashboard();
+      } else if (view === 'traces') {
+        document.getElementById('nav-traces').classList.add('active');
+        document.getElementById('view-traces').classList.remove('hidden');
+        loadTraces();
+      } else if (view === 'detail') {
+        document.getElementById('nav-traces').classList.add('active');
+        document.getElementById('view-detail').classList.remove('hidden');
+        currentTraceId = traceId;
+        loadTraceDetail(traceId);
+      }
+    }
+
+    function refreshCurrentView() {
+      if (currentView === 'dashboard') loadDashboard();
+      else if (currentView === 'traces') loadTraces();
+      else if (currentView === 'detail' && currentTraceId) loadTraceDetail(currentTraceId);
+    }
+
+    // ---- Dashboard ----
+    async function loadDashboard() {
+      const loading = document.getElementById('dashboard-loading');
+      const error = document.getElementById('dashboard-error');
+      const content = document.getElementById('dashboard-content');
+
+      loading.classList.remove('hidden');
+      error.classList.add('hidden');
+      content.classList.add('hidden');
+
+      try {
+        const data = await api('/api/dashboard');
+        loading.classList.add('hidden');
+        content.classList.remove('hidden');
+        renderDashboard(data);
+      } catch (e) {
+        loading.classList.add('hidden');
+        error.classList.remove('hidden');
+        error.textContent = 'Failed to load dashboard: ' + e.message;
+      }
+    }
+
+    function renderDashboard(data) {
+      // Stats
+      const statsGrid = document.getElementById('stats-grid');
+      statsGrid.innerHTML = `
+        <div class="stat-card">
+          <div class="stat-label">Total Traces</div>
+          <div class="stat-value">${data.total_traces}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Success Rate</div>
+          <div class="stat-value" style="color:${data.success_rate >= 0.8 ? 'var(--green)' : data.success_rate >= 0.5 ? 'var(--yellow)' : 'var(--red)'}">
+            ${fmtPercent(data.success_rate)}
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Cost</div>
+          <div class="stat-value">${fmtCost(data.total_cost)}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Tokens</div>
+          <div class="stat-value">${fmtTokens(data.total_tokens)}</div>
+          <div class="stat-sub">Avg ${fmtDuration(data.avg_duration_ms)} per trace</div>
+        </div>
+      `;
+
+      // Charts
+      renderToolChart(data.tool_usage);
+      renderCostChart(data.cost_by_model);
+
+      // Hide charts row if no data
+      const chartsRow = document.getElementById('charts-row');
+      if (Object.keys(data.tool_usage).length === 0 && Object.keys(data.cost_by_model).length === 0) {
+        chartsRow.classList.add('hidden');
+      } else {
+        chartsRow.classList.remove('hidden');
+      }
+
+      // Recent traces
+      const tbody = document.getElementById('recent-traces-body');
+      if (data.recent_traces.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:32px;">No traces yet</td></tr>';
+      } else {
+        tbody.innerHTML = data.recent_traces.map(t => `
+          <tr onclick="navigate('detail','${t.id}')">
+            <td>${successBadge(t.success)}</td>
+            <td><span class="truncate" style="display:block;">${escapeHtml(t.task) || '<span class="text-muted">(no task)</span>'}</span></td>
+            <td class="mono">${fmtCost(t.total_cost)}</td>
+            <td class="mono">${fmtTokens(t.total_tokens)}</td>
+            <td class="mono">${fmtDuration(t.duration_ms)}</td>
+            <td class="text-secondary">${fmtTime(t.start_time)}</td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    function renderToolChart(toolUsage) {
+      const ctx = document.getElementById('chart-tools');
+      if (chartInstances.tools) chartInstances.tools.destroy();
+
+      const names = Object.keys(toolUsage);
+      if (names.length === 0) {
+        ctx.parentElement.innerHTML = '<div class="empty-state" style="padding:24px;">No tool usage data</div>';
+        return;
+      }
+      const calls = names.map(n => toolUsage[n].calls);
+      const errors = names.map(n => toolUsage[n].errors);
+
+      chartInstances.tools = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: names,
+          datasets: [
+            { label: 'Calls', data: calls, backgroundColor: 'rgba(129,140,248,0.6)', borderRadius: 3 },
+            { label: 'Errors', data: errors, backgroundColor: 'rgba(248,113,113,0.6)', borderRadius: 3 },
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#9399b2', font: { size: 11 } } } },
+          scales: {
+            x: { ticks: { color: '#6b7089', font: { size: 11 } }, grid: { color: '#2e3148' } },
+            y: { beginAtZero: true, ticks: { color: '#6b7089', font: { size: 11 }, precision: 0 }, grid: { color: '#2e3148' } }
+          }
+        }
+      });
+    }
+
+    function renderCostChart(costByModel) {
+      const ctx = document.getElementById('chart-cost');
+      if (chartInstances.cost) chartInstances.cost.destroy();
+
+      const models = Object.keys(costByModel);
+      if (models.length === 0) {
+        ctx.parentElement.innerHTML = '<div class="empty-state" style="padding:24px;">No cost data</div>';
+        return;
+      }
+      const costs = models.map(m => costByModel[m]);
+      const colors = ['#818cf8', '#34d399', '#fbbf24', '#f87171', '#60a5fa', '#a78bfa', '#f472b6'];
+
+      chartInstances.cost = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: models,
+          datasets: [{
+            data: costs,
+            backgroundColor: colors.slice(0, models.length),
+            borderWidth: 0,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: { color: '#9399b2', font: { size: 11 }, padding: 12 }
+            },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ctx.label + ': ' + fmtCost(ctx.parsed)
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // ---- Traces List ----
+    async function loadTraces() {
+      const loading = document.getElementById('traces-loading');
+      const error = document.getElementById('traces-error');
+      const content = document.getElementById('traces-content');
+
+      loading.classList.remove('hidden');
+      error.classList.add('hidden');
+      content.classList.add('hidden');
+
+      try {
+        const data = await api('/api/traces');
+        loading.classList.add('hidden');
+        content.classList.remove('hidden');
+        renderTraces(data);
+      } catch (e) {
+        loading.classList.add('hidden');
+        error.classList.remove('hidden');
+        error.textContent = 'Failed to load traces: ' + e.message;
+      }
+    }
+
+    function renderTraces(data) {
+      document.getElementById('traces-count').textContent = data.total;
+      const tbody = document.getElementById('traces-table-body');
+      const empty = document.getElementById('traces-empty');
+
+      if (data.traces.length === 0) {
+        tbody.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      tbody.innerHTML = data.traces.map(t => `
+        <tr onclick="navigate('detail','${t.id}')">
+          <td>${successBadge(t.success)}</td>
+          <td><span class="truncate" style="display:block;">${escapeHtml(t.task) || '<span class="text-muted">(no task)</span>'}</span></td>
+          <td class="mono">${fmtCost(t.total_cost)}</td>
+          <td class="mono">${fmtTokens(t.total_tokens)}</td>
+          <td class="mono">${t.llm_calls}</td>
+          <td class="mono">
+            ${t.tool_calls}
+            ${t.failed_tools > 0 ? '<span class="text-red" style="font-size:11px;"> (' + t.failed_tools + ' err)</span>' : ''}
+          </td>
+          <td><span class="badge badge-accent">${escapeHtml((t.models || []).join(', '))}</span></td>
+          <td class="mono">${fmtDuration(t.duration_ms)}</td>
+        </tr>
+      `).join('');
+    }
+
+    // ---- Trace Detail ----
+    async function loadTraceDetail(traceId) {
+      const loading = document.getElementById('detail-loading');
+      const error = document.getElementById('detail-error');
+      const content = document.getElementById('detail-content');
+
+      loading.classList.remove('hidden');
+      error.classList.add('hidden');
+      content.classList.add('hidden');
+
+      // Hide eval section from previous view
+      document.getElementById('eval-section').classList.add('hidden');
+
+      try {
+        const data = await api('/api/traces/' + traceId);
+        loading.classList.add('hidden');
+        content.classList.remove('hidden');
+        currentTraceData = data;
+        renderTraceDetail(data);
+      } catch (e) {
+        loading.classList.add('hidden');
+        error.classList.remove('hidden');
+        error.textContent = 'Failed to load trace: ' + e.message;
+      }
+    }
+
+    function renderTraceDetail(data) {
+      const c = data.computed || {};
+
+      document.getElementById('detail-breadcrumb-id').textContent = data.id.substring(0, 8);
+      document.getElementById('detail-task-title').textContent = data.task || '(no task)';
+
+      // Meta grid
+      document.getElementById('detail-meta').innerHTML = `
+        <div class="meta-item">
+          <div class="meta-label">Status</div>
+          <div class="meta-value">${successBadge(data.success)}</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Cost</div>
+          <div class="meta-value mono">${fmtCost(c.total_cost)}</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Tokens</div>
+          <div class="meta-value mono">${fmtTokens(c.total_tokens)}</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Duration</div>
+          <div class="meta-value mono">${fmtDuration(c.duration_ms)}</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Tool Calls</div>
+          <div class="meta-value mono">${c.total_tool_calls || 0}${c.failed_tool_calls > 0 ? ' <span class="text-red">(' + c.failed_tool_calls + ' failed)</span>' : ''}</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Trace ID</div>
+          <div class="meta-value mono" style="font-size:12px;">${data.id}</div>
+        </div>
+        ${data.error ? `<div class="meta-item" style="grid-column:1/-1;"><div class="meta-label">Error</div><div class="meta-value text-red" style="font-size:13px;">${escapeHtml(data.error)}</div></div>` : ''}
+      `;
+
+      // Tab counts
+      document.getElementById('tab-count-messages').textContent = (data.messages || []).length;
+      document.getElementById('tab-count-tools').textContent = (data.tool_calls || []).length;
+      document.getElementById('tab-count-llm').textContent = (data.llm_responses || []).length;
+
+      // Render tabs
+      renderMessages(data.messages || []);
+      renderToolCalls(data.tool_calls || []);
+      renderLLMResponses(data.llm_responses || []);
+
+      // Reset to messages tab
+      switchTab(document.querySelector('.tab-btn[data-tab="messages"]'));
+    }
+
+    function renderMessages(messages) {
+      const el = document.getElementById('tab-messages');
+      if (messages.length === 0) {
+        el.innerHTML = '<div class="empty-state">No messages</div>';
+        return;
+      }
+      el.innerHTML = messages.map((m, i) => {
+        const roleClass = 'role-' + (m.role || 'user');
+        const content = escapeHtml(m.content || '');
+        const isLong = content.length > 300;
+        return `
+          <div class="item-entry">
+            <div class="item-entry-header">
+              <span class="role-badge ${roleClass}">${escapeHtml(m.role || 'unknown')}</span>
+              <span class="text-muted" style="font-size:11px;">#${i + 1}</span>
+            </div>
+            <div class="item-entry-body ${isLong ? 'collapsed' : ''}" id="msg-body-${i}">${content || '<span class="text-muted">(empty)</span>'}</div>
+            ${isLong ? `<button class="expand-btn" onclick="toggleExpand('msg-body-${i}', this)">Show more</button>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderToolCalls(toolCalls) {
+      const el = document.getElementById('tab-tools');
+      if (toolCalls.length === 0) {
+        el.innerHTML = '<div class="empty-state">No tool calls</div>';
+        return;
+      }
+      el.innerHTML = toolCalls.map((tc, i) => {
+        const statusBadge = tc.error
+          ? '<span class="badge badge-fail"><span class="badge-dot"></span>Error</span>'
+          : '<span class="badge badge-success"><span class="badge-dot"></span>OK</span>';
+        const argsStr = JSON.stringify(tc.arguments || {}, null, 2);
+        const resultStr = tc.result != null ? escapeHtml(typeof tc.result === 'string' ? tc.result : JSON.stringify(tc.result, null, 2)) : '';
+        const isLong = resultStr.length > 300;
+        return `
+          <div class="item-entry">
+            <div class="item-entry-header">
+              <span class="mono" style="font-weight:600;color:var(--text-primary);">${escapeHtml(tc.name)}</span>
+              ${statusBadge}
+              ${tc.duration_ms != null ? '<span class="text-muted" style="font-size:11px;">' + fmtDuration(tc.duration_ms) + '</span>' : ''}
+            </div>
+            <div class="tool-call-args">${escapeHtml(argsStr)}</div>
+            ${tc.error ? '<div style="margin-top:8px;font-size:13px;color:var(--red);">' + escapeHtml(tc.error) + '</div>' : ''}
+            ${resultStr ? `
+              <div style="margin-top:8px;">
+                <span class="text-muted" style="font-size:11px;">Result:</span>
+                <div class="item-entry-body ${isLong ? 'collapsed' : ''}" id="tool-result-${i}" style="margin-top:4px;font-size:12px;font-family:var(--mono);">${resultStr}</div>
+                ${isLong ? `<button class="expand-btn" onclick="toggleExpand('tool-result-${i}', this)">Show more</button>` : ''}
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderLLMResponses(responses) {
+      const el = document.getElementById('tab-llm');
+      if (responses.length === 0) {
+        el.innerHTML = '<div class="empty-state">No LLM responses</div>';
+        return;
+      }
+      el.innerHTML = responses.map((r, i) => {
+        const content = escapeHtml(r.content || '');
+        const isLong = content.length > 300;
+        return `
+          <div class="item-entry">
+            <div class="item-entry-header">
+              <span class="badge badge-accent">${escapeHtml(r.model)}</span>
+              <span class="text-muted mono" style="font-size:11px;">
+                ${(r.input_tokens || 0).toLocaleString()} in / ${(r.output_tokens || 0).toLocaleString()} out
+              </span>
+              ${r.latency_ms ? '<span class="text-muted" style="font-size:11px;">' + fmtDuration(r.latency_ms) + '</span>' : ''}
+            </div>
+            <div class="item-entry-body ${isLong ? 'collapsed' : ''}" id="llm-body-${i}">${content || '<span class="text-muted">(empty)</span>'}</div>
+            ${isLong ? `<button class="expand-btn" onclick="toggleExpand('llm-body-${i}', this)">Show more</button>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ---- Tab switching ----
+    function switchTab(btn) {
+      if (!btn) return;
+      const tabName = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-messages').classList.add('hidden');
+      document.getElementById('tab-tools').classList.add('hidden');
+      document.getElementById('tab-llm').classList.add('hidden');
+      document.getElementById('tab-' + tabName).classList.remove('hidden');
+    }
+
+    // ---- Expand / Collapse ----
+    function toggleExpand(id, btn) {
+      const el = document.getElementById(id);
+      if (el.classList.contains('collapsed')) {
+        el.classList.remove('collapsed');
+        btn.textContent = 'Show less';
+      } else {
+        el.classList.add('collapsed');
+        btn.textContent = 'Show more';
+      }
+    }
+
+    // ---- Evaluate ----
+    async function runEvaluation() {
+      if (!currentTraceId) return;
+      const btn = document.getElementById('eval-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;margin:0;border-width:2px;"></div> Evaluating...';
+
+      try {
+        const data = await api('/api/evaluate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            trace_id: currentTraceId,
+            evaluators: ['task_completion', 'safety', 'cost', 'tool_usage', 'latency']
+          })
+        });
+        renderEvalResults(data);
+      } catch (e) {
+        alert('Evaluation failed: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Evaluate';
+      }
+    }
+
+    function renderEvalResults(data) {
+      const section = document.getElementById('eval-section');
+      section.classList.remove('hidden');
+
+      const allPassed = data.all_passed;
+      const avgScore = data.avg_score;
+
+      document.getElementById('eval-summary-bar').innerHTML = `
+        <div class="eval-summary-score" style="color:${allPassed ? 'var(--green)' : 'var(--red)'}">
+          ${(avgScore * 100).toFixed(0)}%
+        </div>
+        <div>
+          ${allPassed
+            ? '<span class="badge badge-success"><span class="badge-dot"></span>All Passed</span>'
+            : '<span class="badge badge-fail"><span class="badge-dot"></span>Some Failed</span>'}
+        </div>
+      `;
+
+      document.getElementById('eval-results').innerHTML = data.results.map(r => {
+        const color = r.passed ? 'var(--green)' : 'var(--red)';
+        const pct = (r.score * 100).toFixed(0);
+        return `
+          <div class="eval-result-item">
+            <div class="eval-name">
+              ${r.passed ? '<span class="badge badge-success" style="margin-right:4px;"><span class="badge-dot"></span></span>' : '<span class="badge badge-fail" style="margin-right:4px;"><span class="badge-dot"></span></span>'}
+              ${escapeHtml(r.evaluator)}
+            </div>
+            <div class="eval-score-bar"><div class="eval-score-fill" style="width:${pct}%;background:${color};"></div></div>
+            <div class="eval-score-value" style="color:${color};">${pct}%</div>
+            <div class="eval-message">${escapeHtml(r.message)}</div>
+          </div>
+        `;
+      }).join('');
+
+      // Smooth scroll to eval section
+      section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // ---- Delete ----
+    async function deleteTrace() {
+      if (!currentTraceId) return;
+      if (!confirm('Delete this trace? This cannot be undone.')) return;
+
+      const btn = document.getElementById('delete-btn');
+      btn.disabled = true;
+
+      try {
+        await api('/api/traces/' + currentTraceId, { method: 'DELETE' });
+        navigate('traces');
+      } catch (e) {
+        alert('Delete failed: ' + e.message);
+        btn.disabled = false;
+      }
+    }
+
+    // ---- Init ----
+    navigate('dashboard');
+  </script>
+</body>
+</html>
